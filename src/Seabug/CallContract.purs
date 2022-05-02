@@ -42,7 +42,6 @@ import Contract.Value
   , mkCurrencySymbol
   , mkTokenName
   )
-import Control.Bind (bind)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.Array (singleton)
@@ -52,7 +51,6 @@ import Data.Identity (Identity(Identity))
 import Data.List (toUnfoldable)
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
-import Data.Unit (Unit)
 import Effect (Effect)
 import Effect.Aff (error)
 import Effect.Class (liftEffect)
@@ -154,7 +152,8 @@ type ListNftResultOut =
       }
   }
 
-buildContractConfig :: ContractConfiguration -> Aff (ContractConfig ())
+buildContractConfig
+  :: ContractConfiguration -> Aff (ContractConfig (projectId :: String))
 buildContractConfig cfg = do
   serverPort <- liftM (error "Invalid server port number")
     $ UInt.fromInt' cfg.serverPort
@@ -185,7 +184,7 @@ buildContractConfig cfg = do
     , networkId: networkId
     , slotConfig: defaultSlotConfig
     , logLevel: cfg.logLevel
-    , extraConfig: {}
+    , extraConfig: { projectId: cfg.projectId }
     , wallet
     }
 

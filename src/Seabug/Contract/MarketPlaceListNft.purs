@@ -34,7 +34,9 @@ type ListNftResult =
 -- | Lists the utxos at the script address that contain a datum of type
 -- | `MarketplaceDatum` with unit value. It currently doesn't have any logic
 -- | on matching `CurrencySymbol` and `TokenName`.
-marketPlaceListNft :: forall (r :: Row Type). Contract r (Array ListNftResult)
+marketPlaceListNft
+  :: forall (r :: Row Type)
+   . Contract (projectId :: String | r) (Array ListNftResult)
 marketPlaceListNft = do
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
   networkId <- getNetworkId

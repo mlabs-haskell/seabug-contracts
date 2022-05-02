@@ -45,7 +45,7 @@ type FullSeabugMetadata =
 getFullSeabugMetadata
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName
-  -> Contract r (Either ClientError FullSeabugMetadata)
+  -> Contract (projectId :: String | r) (Either ClientError FullSeabugMetadata)
 getFullSeabugMetadata a@(currSym /\ _) = runExceptT $ do
   seabugMetadata <- getMintingTxSeabugMetadata currSym =<< getMintingTxHash a
   ipfsHash <- getIpfsHash seabugMetadata
@@ -54,7 +54,7 @@ getFullSeabugMetadata a@(currSym /\ _) = runExceptT $ do
 getIpfsHash
   :: forall (r :: Row Type)
    . SeabugMetadata
-  -> ExceptT ClientError (Contract r) Hash
+  -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
 getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
   except <<< (decodeField "image" <=< decodeField "onchain_metadata")
     =<< mkGetRequest ("assets/" <> mkAsset curr collectionNftTN)
@@ -67,7 +67,7 @@ getMintingTxSeabugMetadata
   :: forall (r :: Row Type)
    . CurrencySymbol
   -> Hash
-  -> ExceptT ClientError (Contract r) SeabugMetadata
+  -> ExceptT ClientError (Contract (projectId :: String | r)) SeabugMetadata
 getMintingTxSeabugMetadata currSym txHash = do
   j <- mkGetRequest $ "txs/" <> txHash <> "/metadata"
   ms <- except
@@ -94,7 +94,7 @@ getMintingTxSeabugMetadata currSym txHash = do
 getMintingTxHash
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName
-  -> ExceptT ClientError (Contract r) Hash
+  -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
 getMintingTxHash a =
   except <<< decodeField "initial_mint_tx_hash"
     =<< mkGetRequest ("assets/" <> uncurry mkAsset a)
@@ -119,10 +119,9 @@ decodeField field = lmap ClientDecodeJsonError <<<
 mkGetRequest
   :: forall (r :: Row Type)
    . String
-  -> ExceptT ClientError (Contract r) Json.Json
+  -> ExceptT ClientError (Contract (projectId :: String | r)) Json.Json
 mkGetRequest path = do
-  -- FIXME
-  projectId <- lift $ asks $ undefined -- _.projectId <<< unwrap
+  projectId <- lift $ asks $ _.projectId <<< unwrap
   let
     req :: Affjax.Request Json.Json
     req = Affjax.defaultRequest
