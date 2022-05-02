@@ -43,7 +43,7 @@
         {
           seabug-contracts = project.buildPursProject { sources = [ "exe" ]; };
           seabug-contracts-bundle-web = project.bundlePursProject {
-            sources = [ "exe" ];
+            sources = [ "exe" "src" ];
             main = "Main";
           };
         });
@@ -55,7 +55,7 @@
         in
         {
           seabug-contracts = project.runPursTest {
-            sources = [ "exe" "test" ];
+            sources = [ "exe" "test" "src" ];
           };
           formatting-check = pkgs.runCommand "formatting-check"
             {
