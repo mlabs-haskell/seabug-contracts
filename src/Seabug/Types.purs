@@ -11,6 +11,9 @@ module Seabug.Types
 
 import Contract.Prelude
 
+import Affjax as Affjax
+import Affjax.RequestBody as Affjax.RequestBody
+import Affjax.ResponseFormat as Affjax.ResponseFormat
 import Cardano.Types.Value as Cardano.Types.Value
 import Contract.Value
   ( CurrencySymbol
@@ -19,7 +22,7 @@ import Contract.Value
   , getTokenName
   , mkCurrencySymbol
   )
-import Contract.Monad (Contract)
+import Contract.Monad (Contract(Contract), mkHttpUrl)
 import Contract.Address (PaymentPubKeyHash, PubKeyHash)
 import Contract.Aeson (caseAesonObject, getField, jsonToAeson) as Aeson
 import Contract.PlutusData
@@ -32,6 +35,7 @@ import Contract.PlutusData
 import Contract.Prim.ByteArray
   ( ByteArray
   , byteArrayFromIntArrayUnsafe
+  , byteArrayToHex
   )
 import Contract.Numeric.Natural (Natural, toBigInt)
 import Contract.Scripts
@@ -40,18 +44,24 @@ import Contract.Scripts
   , scriptHashToBytes
   )
 import Contract.Time (Slot)
-import Data.Argonaut
-  ( class DecodeJson
-  , JsonDecodeError(TypeMismatch)
-  , caseJsonObject
-  , getField
-  ) as Json
+import Control.Monad.Reader.Trans (asks)
+import Data.Argonaut as Json
+import Data.Argonaut.Encode.Encoders (encodeString)
+import Data.Bifunctor (bimap, lmap)
 import Data.BigInt (BigInt, fromInt, toInt)
 import Partial.Unsafe (unsafePartial)
 
--- FIXME
-blake2bHash :: forall (a :: Type). a
-blake2bHash = undefined
+blake2bHash :: forall (r :: Row Type). ByteArray -> Contract r (Maybe ByteArray)
+blake2bHash bytes = Contract $ do
+  url <- asks $ (_ <> "/" <> "blake2b") <<< mkHttpUrl <<< _.serverConfig
+  let
+    reqBody :: Maybe Affjax.RequestBody.RequestBody
+    reqBody = Just
+      $ Affjax.RequestBody.Json
+      $ encodeString
+      $ byteArrayToHex bytes
+  liftAff (Affjax.post Affjax.ResponseFormat.json url reqBody)
+    <#> either (const Nothing) (hush <<< Json.decodeJson <<< _.body)
 
 -- Field names have been simplified due to row polymorphism. Please let me know
 -- if the field names must be exact.
