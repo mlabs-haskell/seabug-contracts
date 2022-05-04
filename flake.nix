@@ -41,7 +41,6 @@
           project = psProjectFor system;
         in
         {
-          seabug-contracts = project.buildPursProject { sources = [ "exe" ]; };
           seabug-contracts-bundle-web = project.bundlePursProject {
             sources = [ "exe" "src" ];
             main = "Main";
