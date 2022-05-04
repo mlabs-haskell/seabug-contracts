@@ -70,6 +70,15 @@
             '';
         });
 
+      check = perSystem (system:
+        (nixpkgsFor system).runCommand "combined-test"
+          {
+            nativeBuildInputs = builtins.attrValues self.checks.${system}
+              ++ builtins.attrValues self.packages.${system};
+          }
+          "touch $out"
+      );
+
       devShell = perSystem (system: (psProjectFor system).devShell);
     };
 }
