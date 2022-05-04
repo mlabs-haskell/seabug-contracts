@@ -41,7 +41,6 @@
           project = psProjectFor system;
         in
         {
-          seabug-contracts = project.buildPursProject { sources = [ "exe" ]; };
           seabug-contracts-bundle-web = project.bundlePursProject {
             sources = [ "exe" "src" ];
             main = "Main";
@@ -70,6 +69,15 @@
               touch $out
             '';
         });
+
+      check = perSystem (system:
+        (nixpkgsFor system).runCommand "combined-test"
+          {
+            nativeBuildInputs = builtins.attrValues self.checks.${system}
+              ++ builtins.attrValues self.packages.${system};
+          }
+          "touch $out"
+      );
 
       devShell = perSystem (system: (psProjectFor system).devShell);
     };
