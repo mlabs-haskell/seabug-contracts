@@ -34,7 +34,7 @@ import Contract.PlutusData
   , unitRedeemer
   )
 import Contract.ProtocolParameters.Alonzo (minAdaTxOut)
-import Contract.Scripts (typedValidatorEnterpriseAddress)
+import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( BalancedSignedTransaction(BalancedSignedTransaction)
   , TxOut
@@ -98,9 +98,19 @@ mkMarketplaceTx
   -> Contract r
        (UnattachedUnbalancedTx /\ Value.CurrencySymbol /\ Value.TokenName)
 mkMarketplaceTx (NftData nftData) = do
+  let nftCollection = unwrap nftData.nftCollection
   pkh <- liftedM "marketplaceBuy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
-  policy <- liftedE $ pure mintingPolicy
+  policy' <- liftedE $ pure mintingPolicy
+  policy <- liftedE $ applyArgs policy'
+              [ toData nftCollection.collectionNftCs
+              , toData nftCollection.lockingScript
+              , toData nftCollection.author
+              , toData nftCollection.authorShare
+              , toData nftCollection.daoScript
+              , toData nftCollection.daoShare
+              ]
+
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
     $ Value.scriptCurrencySymbol
     $ policy
@@ -126,7 +136,6 @@ mkMarketplaceTx (NftData nftData) = do
     nftPrice = nft'.price
     valHash = marketplaceValidator'.validatorHash
     mintRedeemer = Redeemer $ toData $ ChangeOwner nft pkh
-    nftCollection = unwrap nftData.nftCollection
 
     containsNft :: forall (a :: Type). (a /\ TxOut) -> Boolean
     containsNft (_ /\ tx) =
