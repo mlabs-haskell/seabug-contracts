@@ -103,13 +103,13 @@ mkMarketplaceTx (NftData nftData) = do
     ownPaymentPubKeyHash
   policy' <- liftedE $ pure mintingPolicy
   policy <- liftedE $ applyArgs policy'
-              [ toData nftCollection.collectionNftCs
-              , toData nftCollection.lockingScript
-              , toData nftCollection.author
-              , toData nftCollection.authorShare
-              , toData nftCollection.daoScript
-              , toData nftCollection.daoShare
-              ]
+    [ toData nftCollection.collectionNftCs
+    , toData nftCollection.lockingScript
+    , toData nftCollection.author
+    , toData nftCollection.authorShare
+    , toData nftCollection.daoScript
+    , toData nftCollection.daoShare
+    ]
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
     $ Value.scriptCurrencySymbol
