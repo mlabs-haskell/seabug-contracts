@@ -2,8 +2,8 @@ SHELL := bash
 .ONESHELL:
 .SHELLFLAGS := -eu -o pipefail -c
 
-ps-sources := $(shell fd -epurs)
-ps-entrypoint := Main
+ps-sources := $(shell find . -type f -name "*.purs")
+ps-entrypoint := Seabug
 ps-bundle = spago bundle-module -m ${ps-entrypoint} --to output.js
 
 run-dev:
