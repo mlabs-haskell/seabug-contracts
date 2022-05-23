@@ -51,7 +51,7 @@ marketPlaceListNft = do
         datumHash <- MaybeT $ pure $ out.dataHash
         plutusData <- MaybeT $ getDatumByHash datumHash
         MarketplaceDatum { getMarketplaceDatum: curr /\ name } <-
-          MaybeT $ pure $ fromData plutusData
+          MaybeT $ pure $ fromData $ unwrap plutusData
         let (Identity amt) = toPlutusType out.amount
         guard $ valueOf amt curr name == one
         metadata <- MaybeT $ map hush $ getFullSeabugMetadata $ curr /\ name

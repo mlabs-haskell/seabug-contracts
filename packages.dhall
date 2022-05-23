@@ -108,7 +108,72 @@ let upstream =
       https://github.com/purescript/package-sets/releases/download/psc-0.14.5-20211116/packages.dhall sha256:7ba810597a275e43c83411d2ab0d4b3c54d0b551436f4b1632e9ff3eb62e327a
 
 let additions =
-      {
+      { aeson =
+        { dependencies =
+          [ "aff"
+          , "argonaut"
+          , "argonaut-codecs"
+          , "argonaut-core"
+          , "arrays"
+          , "bifunctors"
+          , "bigints"
+          , "const"
+          , "control"
+          , "effect"
+          , "either"
+          , "exceptions"
+          , "foldable-traversable"
+          , "foreign-object"
+          , "gen"
+          , "identity"
+          , "integers"
+          , "maybe"
+          , "newtype"
+          , "node-buffer"
+          , "node-fs-aff"
+          , "node-path"
+          , "nonempty"
+          , "numbers"
+          , "partial"
+          , "prelude"
+          , "quickcheck"
+          , "record"
+          , "sequences"
+          , "spec"
+          , "strings"
+          , "transformers"
+          , "tuples"
+          , "typelevel"
+          , "typelevel-prelude"
+          , "uint"
+          , "untagged-union"
+          ]
+        , repo = "https://github.com/mlabs-haskell/purescript-aeson.git"
+        , version = "5054e03ee14376768071c24d63889bfab8db2667"
+        }
+      , sequences =
+        { dependencies =
+          [ "arrays"
+          , "assert"
+          , "console"
+          , "effect"
+          , "lazy"
+          , "maybe"
+          , "newtype"
+          , "nonempty"
+          , "partial"
+          , "prelude"
+          , "profunctor"
+          , "psci-support"
+          , "quickcheck"
+          , "quickcheck-laws"
+          , "tuples"
+          , "unfoldable"
+          , "unsafe-coerce"
+          ]
+        , repo = "https://github.com/hdgarrood/purescript-sequences"
+        , version = "v3.0.2"
+        }
       , properties =
           { dependencies = ["prelude", "console"]
           , repo = "https://github.com/Risto-Stevcev/purescript-properties.git"
@@ -171,12 +236,10 @@ let additions =
         }
       , cardano-transaction-lib =
           { dependencies =
-            [ "aff"
+            [ "aeson"
+            , "aff"
             , "aff-promise"
             , "affjax"
-            , "argonaut"
-            , "argonaut-codecs"
-            , "argonaut-core"
             , "arraybuffer-types"
             , "arrays"
             , "bifunctors"
@@ -193,7 +256,6 @@ let additions =
             , "exceptions"
             , "foldable-traversable"
             , "foreign-object"
-            , "gen"
             , "identity"
             , "integers"
             , "js-date"
@@ -207,7 +269,6 @@ let additions =
             , "node-buffer"
             , "node-fs"
             , "node-fs-aff"
-            , "node-path"
             , "nonempty"
             , "ordered-collections"
             , "partial"
@@ -234,7 +295,7 @@ let additions =
             , "variant"
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
-        , version = "a83d75e852571e6a8ad2e60c449f198e1b3270a2"
+        , version = "624c3411c732d222959b7b04b449e6f6ba6acfd6"
         }
       }
 in  upstream // additions

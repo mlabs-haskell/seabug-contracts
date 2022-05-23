@@ -14,7 +14,7 @@ import Contract.Address
 import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
 import Contract.ScriptLookups
   ( mintingPolicy
-  , otherScript
+  , validator
   , ownPaymentPubKeyHash
   , typedValidatorLookups
   , unspentOutputs
@@ -44,7 +44,7 @@ import Contract.Transaction
 import Contract.TxConstraints
   ( TxConstraints
   , mustMintValueWithRedeemer
-  , mustPayToOtherScript
+  , mustPayToScript
   , mustPayWithDatumToPubKey
   , mustSpendScriptOutput
   )
@@ -181,7 +181,7 @@ mkMarketplaceTx (NftData nftData) = do
     lookup = mconcat
       [ ScriptLookups.mintingPolicy policy
       , ScriptLookups.typedValidatorLookups $ wrap marketplaceValidator'
-      , ScriptLookups.otherScript marketplaceValidator'.validator
+      , ScriptLookups.validator marketplaceValidator'.validator
       , ScriptLookups.unspentOutputs $ insert utxo utxoIndex $ unwrap userUtxos
       , ScriptLookups.ownPaymentPubKeyHash pkh
       ]
@@ -191,7 +191,7 @@ mkMarketplaceTx (NftData nftData) = do
     constraints =
       filterLowValue
         daoShare
-        (mustPayToOtherScript nftCollection.daoScript datum)
+        (mustPayToScript nftCollection.daoScript datum)
         <> filterLowValue
           authorShare
           (mustPayWithDatumToPubKey nftCollection.author datum)
@@ -199,7 +199,7 @@ mkMarketplaceTx (NftData nftData) = do
           [ mustMintValueWithRedeemer mintRedeemer (newNftValue <> oldNftValue)
           , mustSpendScriptOutput utxo unitRedeemer
           , mustPayWithDatumToPubKey nft'.owner datum ownerShare
-          , mustPayToOtherScript
+          , mustPayToScript
               valHash
               ( Datum $ toData $
                   MarketplaceDatum { getMarketplaceDatum: curr /\ newName }
