@@ -1,7 +1,6 @@
 module Seabug
   ( module Seabug.CallContract
-  -- , connectWallet
-  -- , getWalletBalance
+  , getWalletBalance
   )
   where
 
@@ -18,8 +17,8 @@ import Seabug.CallContract
 -- connectWallet :: Effect (Promise Wallet)
 -- connectWallet = fromAff mkNamiWalletAff
 
--- getWalletBalance :: Effect (Promise (Maybe Value))
--- getWalletBalance = fromAff $ do
---   (Nami nami) <- mkNamiWalletAff
---   callNami nami _.getBalance
+getWalletBalance :: Effect (Promise (Maybe Value))
+getWalletBalance = fromAff $ do
+  (Nami nami) <- mkNamiWalletAff
+  callNami nami _.getBalance
 

@@ -13,8 +13,8 @@ const seabug = import("./output.js");
  *
  */
 exports.callMarketPlaceBuy = async (config, args) => {
-    const sb = await seabug;
-    return sb.callMarketPlaceBuy(config)(args)();
+  const sb = await seabug;
+  return sb.callMarketPlaceBuy(config)(args)();
 };
 
 /**
@@ -23,23 +23,15 @@ exports.callMarketPlaceBuy = async (config, args) => {
  *
  */
 exports.callMarketPlaceListNft = async (config) => {
-    const sb = await seabug;
-    return sb.callMarketPlaceListNft(config)();
+  const sb = await seabug;
+  return sb.callMarketPlaceListNft(config)();
 };
 
-/**
- * Connects to Nami wallet.
- * Returns a promise holding the Nami wallet object.
- */
- exports.connectWallet = async () => {
-    const sb = await seabug;
-    return sb.connectWallet();
-};
 
 /**
- * Returns a promise holding the wallet balance.
+ * Returns a promise containing the connected wallet's balance.
  */
 exports.getWalletBalance = async () => {
-    const sb = await seabug;
-    return sb.getWalletBalance();
-}
+  const sb = await seabug;
+  return sb.getWalletBalance();
+};
