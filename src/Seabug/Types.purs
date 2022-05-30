@@ -57,7 +57,8 @@ blake2bHash bytes = Contract $ do
       $ encodeString
       $ byteArrayToHex bytes
   liftAff (Affjax.post Affjax.ResponseFormat.json url reqBody)
-    <#> either (const Nothing) (hush <<< Aeson.decodeAeson <<< Aeson.jsonToAeson <<< _.body)
+    <#> either (const Nothing)
+      (hush <<< Aeson.decodeAeson <<< Aeson.jsonToAeson <<< _.body)
 
 -- Field names have been simplified due to row polymorphism. Please let me know
 -- if the field names must be exact.

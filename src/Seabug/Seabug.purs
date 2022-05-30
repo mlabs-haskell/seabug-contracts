@@ -1,7 +1,6 @@
 module Seabug
   ( module Seabug.CallContract
-  )
-  where
+  ) where
 
 -- import Prelude
 

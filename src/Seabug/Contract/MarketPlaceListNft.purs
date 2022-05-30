@@ -9,7 +9,10 @@ import Contract.Prelude
 import Contract.Address (getNetworkId, typedValidatorEnterpriseAddress)
 import Contract.Monad (Contract, liftContractE, liftedM)
 import Contract.PlutusData (fromData, getDatumByHash)
-import Contract.Transaction (TransactionInput, TransactionOutput(TransactionOutput))
+import Contract.Transaction
+  ( TransactionInput
+  , TransactionOutput(TransactionOutput)
+  )
 import Contract.Utxos (utxosAt)
 import Contract.Value (valueOf)
 import Control.Alternative (guard)
@@ -38,9 +41,11 @@ marketPlaceListNft = do
   scriptAddr <-
     liftedM "marketPlaceListNft: Cannot convert validator hash to address"
       $ pure
-      $ typedValidatorEnterpriseAddress networkId $ wrap marketplaceValidator'
+      $ typedValidatorEnterpriseAddress networkId
+      $ wrap marketplaceValidator'
   scriptUtxos <- Map.toUnfoldable <<< unwrap <$>
-    liftedM "marketPlaceListNft: Cannot get script Utxos" (utxosAt (unwrap scriptAddr).address)
+    liftedM "marketPlaceListNft: Cannot get script Utxos"
+      (utxosAt (unwrap scriptAddr).address)
   withMetadata <- for scriptUtxos $
     \(input /\ output@(TransactionOutput out)) ->
       runMaybeT $ do

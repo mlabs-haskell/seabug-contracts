@@ -22,7 +22,10 @@ import Contract.Prim.ByteArray
   ( byteArrayToHex
   , hexToByteArray
   )
-import Contract.Transaction (TransactionInput(TransactionInput), TransactionOutput(TransactionOutput))
+import Contract.Transaction
+  ( TransactionInput(TransactionInput)
+  , TransactionOutput(TransactionOutput)
+  )
 import Contract.Value
   ( CurrencySymbol
   , TokenName
@@ -190,7 +193,9 @@ buildNftList
     transactionId = byteArrayToHex $ unwrap input.transactionId
     inputIndex = UInt.toInt input.index
     -- TODO: What do we do if this fails?
-    address = addressBech32 $ unsafePartial $ fromJust $ fromPlutusType $ network /\ output.address
+    address =
+      addressBech32 $ unsafePartial $ fromJust $ fromPlutusType $ network /\
+        output.address
     dataHash = fromMaybe mempty $ byteArrayToHex <<< unwrap <$> output.dataHash
     ipfsHash = metadata.ipfsHash
     seabugMetadata = convertSeabugMetaData metadata.seabugMetadata
@@ -220,12 +225,14 @@ buildNftList
         m.collectionNftCS
     , collectionNftTN: byteArrayToHex $ unwrap $ getTokenName m.collectionNftTN
     , lockingScript: scriptHashToBech32Unsafe "script" $ unwrap m.lockingScript
-    , authorPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap m.authorPkh
+    , authorPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap
+        m.authorPkh
     , authorShare: unShare m.authorShare
     , marketplaceScript: scriptHashToBech32Unsafe "script" $ unwrap
         m.marketplaceScript
     , marketplaceShare: unShare m.marketplaceShare
-    , ownerPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap m.ownerPkh
+    , ownerPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap
+        m.ownerPkh
     , ownerPrice: toBigInt m.ownerPrice
     }
 

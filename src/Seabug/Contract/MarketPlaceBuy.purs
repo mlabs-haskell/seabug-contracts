@@ -125,7 +125,8 @@ mkMarketplaceTx (NftData nftData) = do
   scriptAddr <-
     liftedM "marketplaceBuy: Cannot convert validator hash to address"
       $ pure
-      $ typedValidatorEnterpriseAddress networkId $ wrap marketplaceValidator'
+      $ typedValidatorEnterpriseAddress networkId
+      $ wrap marketplaceValidator'
   oldName <- liftedM "marketplaceBuy: Cannot hash old token" $ mkTokenName nft
   newName <- liftedM "marketplaceBuy: Cannot hash new token"
     $ mkTokenName newNft
@@ -165,9 +166,11 @@ mkMarketplaceTx (NftData nftData) = do
     datum = Datum $ toData $ curr /\ oldName
   userAddr <- liftedM "marketplaceBuy: Cannot get user addr" getWalletAddress
   userUtxos <-
-    liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt (unwrap userAddr).address
+    liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt
+      (unwrap userAddr).address
   scriptUtxos <-
-    liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt (unwrap scriptAddr).address
+    liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt
+      (unwrap scriptAddr).address
   utxo /\ utxoIndex <-
     liftContractM "marketplaceBuy: NFT not found on marketplace"
       $ Array.find containsNft

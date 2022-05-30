@@ -22,5 +22,6 @@ jsonReader
   => String
   -> Json
   -> Either JsonDecodeError a
-jsonReader field = jsonToAeson >>> caseAesonObject (Left $ TypeMismatch "Expected Object")
+jsonReader field = jsonToAeson >>> caseAesonObject
+  (Left $ TypeMismatch "Expected Object")
   (flip getField field)
