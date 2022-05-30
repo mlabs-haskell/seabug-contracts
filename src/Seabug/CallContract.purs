@@ -11,7 +11,7 @@ import Contract.Address (Slot(Slot))
 import Contract.Monad
   ( ConfigParams(ConfigParams)
   , ContractConfig
-  , LogLevel(Debug)
+  , LogLevel
   , defaultSlotConfig
   , mkContractConfig
   , runContract
@@ -22,16 +22,7 @@ import Contract.Prim.ByteArray
   ( byteArrayToHex
   , hexToByteArray
   )
-import Contract.Scripts
-  ( ed25519KeyHashToBytes
-  , ed25519KeyHashFromBytes
-  , scriptHashFromBech32
-  , scriptHashToBech32Unsafe
-  )
-import Contract.Transaction
-  ( TransactionInput(TransactionInput)
-  , TransactionOutput(TransactionOutput)
-  )
+import Contract.Transaction (TransactionInput(TransactionInput), TransactionOutput(TransactionOutput))
 import Contract.Value
   ( CurrencySymbol
   , TokenName
@@ -44,11 +35,9 @@ import Contract.Value
   )
 import Control.Promise (Promise)
 import Control.Promise as Promise
-import Data.Array (singleton)
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
-import Data.Identity (Identity(Identity))
-import Data.List (toUnfoldable)
+import Data.Maybe (fromJust)
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
@@ -58,7 +47,7 @@ import Effect.Exception (Error)
 import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
 import Metadata.Seabug.Share (unShare)
 import Partial.Unsafe (unsafePartial)
-import Plutus.ToPlutusType (toPlutusType)
+import Plutus.FromPlutusType (fromPlutusType)
 import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
 import Seabug.Contract.MarketPlaceListNft (ListNftResult, marketPlaceListNft)
 import Seabug.Types
@@ -66,9 +55,14 @@ import Seabug.Types
   , NftData(NftData)
   , NftId(NftId)
   )
-import Serialization.Address (addressBech32, intToNetworkId)
+import Serialization.Address (NetworkId, addressBech32, intToNetworkId)
+import Serialization.Hash
+  ( ed25519KeyHashToBytes
+  , ed25519KeyHashFromBytes
+  , scriptHashFromBech32
+  , scriptHashToBech32Unsafe
+  )
 import Types.Natural as Nat
-import Types.UsedTxOuts (newUsedTxOuts)
 import Wallet (mkNamiWalletAff)
 
 -- | Exists temporarily for testing purposes
@@ -91,7 +85,7 @@ callMarketPlaceListNft
 callMarketPlaceListNft cfg = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
   listnft <- runContract contractConfig marketPlaceListNft
-  pure $ buildNftList <$> listnft
+  pure $ buildNftList (unwrap contractConfig).networkId <$> listnft
 
 -- | Configuation needed to call contracts from JS.
 type ContractConfiguration =
@@ -188,13 +182,15 @@ buildContractConfig cfg = do
     , wallet
     }
 
-buildNftList :: ListNftResult -> ListNftResultOut
+buildNftList :: NetworkId -> ListNftResult -> ListNftResultOut
 buildNftList
+  network
   { input: TransactionInput input, output: TransactionOutput output, metadata } =
   let
     transactionId = byteArrayToHex $ unwrap input.transactionId
     inputIndex = UInt.toInt input.index
-    address = addressBech32 output.address
+    -- TODO: What do we do if this fails?
+    address = addressBech32 $ unsafePartial $ fromJust $ fromPlutusType $ network /\ output.address
     dataHash = fromMaybe mempty $ byteArrayToHex <<< unwrap <$> output.dataHash
     ipfsHash = metadata.ipfsHash
     seabugMetadata = convertSeabugMetaData metadata.seabugMetadata
@@ -204,19 +200,15 @@ buildNftList
     , metadata: { ipfsHash, seabugMetadata }
     }
   where
-  convertValue :: Cardano.Types.Value.Value -> ValueOut
-  convertValue v =
-    let
-      (Identity val) = toPlutusType v
-    in
-      mkValueRecord <$> flattenNonAdaAssets val
+  convertValue :: Value -> ValueOut
+  convertValue val = mkValueRecord <$> flattenNonAdaAssets val
 
   mkValueRecord
     :: (CurrencySymbol /\ TokenName /\ BigInt)
     -> { currencySymbol :: String, tokenName :: String, amount :: BigInt }
   mkValueRecord (currencySymbol /\ tokenName /\ amount) =
     { currencySymbol: byteArrayToHex $ getCurrencySymbol currencySymbol
-    , tokenName: byteArrayToHex $ getTokenName tokenName
+    , tokenName: byteArrayToHex $ unwrap $ getTokenName tokenName
     , amount
     }
 
@@ -226,14 +218,14 @@ buildNftList
     , mintPolicy: byteArrayToHex m.mintPolicy
     , collectionNftCS: byteArrayToHex $ Cardano.Types.Value.getCurrencySymbol $
         m.collectionNftCS
-    , collectionNftTN: byteArrayToHex $ getTokenName m.collectionNftTN
+    , collectionNftTN: byteArrayToHex $ unwrap $ getTokenName m.collectionNftTN
     , lockingScript: scriptHashToBech32Unsafe "script" $ unwrap m.lockingScript
-    , authorPkh: byteArrayToHex $ ed25519KeyHashToBytes $ unwrap m.authorPkh
+    , authorPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap m.authorPkh
     , authorShare: unShare m.authorShare
     , marketplaceScript: scriptHashToBech32Unsafe "script" $ unwrap
         m.marketplaceScript
     , marketplaceShare: unShare m.marketplaceShare
-    , ownerPkh: byteArrayToHex $ ed25519KeyHashToBytes $ unwrap m.ownerPkh
+    , ownerPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap m.ownerPkh
     , ownerPrice: toBigInt m.ownerPrice
     }
 
@@ -252,7 +244,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
     owner <- note (error $ "Invalid owner: " <> r.owner)
       $ wrap
       <<< wrap
-      <$> (ed25519KeyHashFromBytes =<< hexToByteArray r.owner)
+      <$> (ed25519KeyHashFromBytes <<< wrap =<< hexToByteArray r.owner)
     pure $ NftId
       { collectionNftTn: tn
       , price
@@ -274,7 +266,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
     author <- note (error $ "Invalid author: " <> r.author)
       $ wrap
       <<< wrap
-      <$> (ed25519KeyHashFromBytes =<< hexToByteArray r.author)
+      <$> (ed25519KeyHashFromBytes <<< wrap =<< hexToByteArray r.author)
     authorShare <- note (error $ "Invalid authorShare: " <> show r.authorShare)
       $ Nat.fromBigInt r.authorShare
     daoScript <- note (error $ "Invalid nft daoScript: " <> r.daoScript)

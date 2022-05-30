@@ -9,18 +9,13 @@ import Contract.Prelude
 import Contract.Address (getNetworkId, typedValidatorEnterpriseAddress)
 import Contract.Monad (Contract, liftContractE, liftedM)
 import Contract.PlutusData (fromData, getDatumByHash)
-import Contract.Transaction
-  ( TransactionInput
-  , TransactionOutput(TransactionOutput)
-  )
+import Contract.Transaction (TransactionInput, TransactionOutput(TransactionOutput))
 import Contract.Utxos (utxosAt)
 import Contract.Value (valueOf)
 import Control.Alternative (guard)
 import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
 import Data.Array (catMaybes)
-import Data.Identity (Identity(Identity))
 import Data.Map as Map
-import Plutus.ToPlutusType (toPlutusType)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.Metadata (FullSeabugMetadata, getFullSeabugMetadata)
 import Seabug.Types (MarketplaceDatum(MarketplaceDatum))
@@ -40,11 +35,12 @@ marketPlaceListNft
 marketPlaceListNft = do
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
   networkId <- getNetworkId
-  let
-    scriptAddr =
-      typedValidatorEnterpriseAddress networkId $ wrap marketplaceValidator'
+  scriptAddr <-
+    liftedM "marketPlaceListNft: Cannot convert validator hash to address"
+      $ pure
+      $ typedValidatorEnterpriseAddress networkId $ wrap marketplaceValidator'
   scriptUtxos <- Map.toUnfoldable <<< unwrap <$>
-    liftedM "marketPlaceListNft: Cannot get script Utxos" (utxosAt scriptAddr)
+    liftedM "marketPlaceListNft: Cannot get script Utxos" (utxosAt (unwrap scriptAddr).address)
   withMetadata <- for scriptUtxos $
     \(input /\ output@(TransactionOutput out)) ->
       runMaybeT $ do
@@ -52,8 +48,7 @@ marketPlaceListNft = do
         plutusData <- MaybeT $ getDatumByHash datumHash
         MarketplaceDatum { getMarketplaceDatum: curr /\ name } <-
           MaybeT $ pure $ fromData $ unwrap plutusData
-        let (Identity amt) = toPlutusType out.amount
-        guard $ valueOf amt curr name == one
+        guard $ valueOf out.amount curr name == one
         metadata <- MaybeT $ map hush $ getFullSeabugMetadata $ curr /\ name
         pure { input, output, metadata }
   pure $ catMaybes withMetadata

@@ -40,7 +40,7 @@ main = launchAff_ $ do
 testNftData :: forall (r :: Row Type). Contract r NftData
 testNftData = do
   kh <- liftContractM "`Ed25519KeyHash`"
-    $ ed25519KeyHashFromBytes
+    $ ed25519KeyHashFromBytes <<< wrap
     =<< hexToByteArray
       "3f3464650beb5324d0e463ebe81fbe1fd519b6438521e96d0d35bd75"
   collectionNftCs <- liftContractM "`CurrencySymbol`"
@@ -48,11 +48,11 @@ testNftData = do
     =<< hexToByteArray
       "cf0c1cbf47537f238f756fc1be191abf76009e1988910092184c4b7f"
   lockingScript <- liftContractM "`ScriptHash`"
-    $ scriptHashFromBytes
+    $ scriptHashFromBytes <<< wrap
     =<< hexToByteArray
       "6c1039b6973bb0e7ad42de5b16a691ede3e0265cd58caf070ff15ef3"
   daoScript <- liftContractM "`ScriptHash`"
-    $ scriptHashFromBytes
+    $ scriptHashFromBytes <<< wrap
     =<< hexToByteArray
       "9da8fa76a2a0f52aa5df10fb7b81f9afe4b20e9068b3f95fadc7477a"
   tokenName <- liftContractM "`TokenName`"

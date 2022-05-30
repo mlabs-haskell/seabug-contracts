@@ -6,6 +6,7 @@ module Seabug.Metadata
 
 import Contract.Prelude
 
+import Aeson as Aeson
 import Affjax as Affjax
 import Affjax.RequestHeader as Affjax.RequestHeader
 import Affjax.ResponseFormat as Affjax.ResponseFormat
@@ -26,8 +27,7 @@ import Control.Alternative (guard)
 import Control.Monad.Except.Trans (ExceptT(ExceptT), except, runExceptT)
 import Control.Monad.Reader.Trans (asks)
 import Control.Monad.Trans.Class (lift)
-import Data.Argonaut (class DecodeJson)
-import Data.Argonaut as Json
+import Data.Argonaut as Argonaut
 import Data.Bifunctor (bimap, lmap)
 import Data.Function (on)
 import Data.HTTP.Method (Method(GET))
@@ -57,7 +57,7 @@ getIpfsHash
    . SeabugMetadata
   -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
 getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
-  except <<< (decodeField "image" <=< decodeField "onchain_metadata")
+  except <<< (decodeField "image" <=< decodeFieldJson "onchain_metadata")
     =<< mkGetRequest ("assets/" <> mkAsset curr collectionNftTN)
   where
   curr :: CurrencySymbol
@@ -70,24 +70,24 @@ getMintingTxSeabugMetadata
   -> Hash
   -> ExceptT ClientError (Contract (projectId :: String | r)) SeabugMetadata
 getMintingTxSeabugMetadata currSym txHash = do
-  j <- mkGetRequest $ "txs/" <> txHash <> "/metadata"
+  res <- mkGetRequest $ "txs/" <> txHash <> "/metadata"
   ms <- except
     $ lmap ClientDecodeJsonError
-    $ Json.caseJsonArray
-        (Left (Json.TypeMismatch "Expected array of objects"))
+    $ Aeson.caseAesonArray
+        (Left (Argonaut.TypeMismatch "Expected array of objects"))
         Right
-        j
+        (Aeson.jsonToAeson res)
   except
-    $ note (ClientDecodeJsonError (Json.UnexpectedValue j))
+    $ note (ClientDecodeJsonError (Argonaut.UnexpectedValue res))
     $ findSeabugMetadata ms
   where
-  findSeabugMetadata :: Array Json.Json -> Maybe SeabugMetadata
-  findSeabugMetadata = findMap $ Json.caseJsonObject Nothing $ \o -> do
-    label <- hush $ Json.getField o "label"
+  findSeabugMetadata :: Array Aeson.Aeson -> Maybe SeabugMetadata
+  findSeabugMetadata = findMap $ Aeson.caseAesonObject Nothing $ \o -> do
+    label <- hush $ Aeson.getField o "label"
     guard $ label == "727"
     hush $ do
-      md <- Json.getField o "json_metadata"
-      Json.decodeJson =<< Json.getField md currSymKey
+      md <- Aeson.getField o "json_metadata"
+      Aeson.decodeAeson =<< Aeson.getField md currSymKey
 
   currSymKey :: String
   currSymKey = byteArrayToHex $ getCurrencySymbol currSym
@@ -97,7 +97,7 @@ getMintingTxHash
    . CurrencySymbol /\ TokenName
   -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
 getMintingTxHash a =
-  except <<< decodeField "initial_mint_tx_hash"
+  except <<< decodeFieldJson "initial_mint_tx_hash"
     =<< mkGetRequest ("assets/" <> uncurry mkAsset a)
 
 mkAsset :: CurrencySymbol -> TokenName -> String
@@ -106,25 +106,33 @@ mkAsset currSym tname =
 
 decodeField
   :: forall (a :: Type)
-   . DecodeJson a
+   . Aeson.DecodeAeson a
   => String
-  -> Json.Json
+  -> Aeson.Aeson
   -> Either ClientError a
 decodeField field = lmap ClientDecodeJsonError <<<
-  ( Json.decodeJson
-      <=< Json.caseJsonObject
-        (Left (Json.TypeMismatch "Expected Object"))
-        (flip Json.getField field)
+  ( Aeson.decodeAeson
+      <=< Aeson.caseAesonObject
+        (Left (Argonaut.TypeMismatch "Expected Object"))
+        (flip Aeson.getField field)
   )
+
+decodeFieldJson
+  :: forall (a :: Type)
+   . Aeson.DecodeAeson a
+  => String
+  -> Argonaut.Json
+  -> Either ClientError a
+decodeFieldJson field = decodeField field <<< Aeson.jsonToAeson
 
 mkGetRequest
   :: forall (r :: Row Type)
    . String
-  -> ExceptT ClientError (Contract (projectId :: String | r)) Json.Json
+  -> ExceptT ClientError (Contract (projectId :: String | r)) Argonaut.Json
 mkGetRequest path = do
   projectId <- lift $ asks $ _.projectId <<< unwrap
   let
-    req :: Affjax.Request Json.Json
+    req :: Affjax.Request Argonaut.Json
     req = Affjax.defaultRequest
       { url = mkUrl
       , responseFormat = Affjax.ResponseFormat.json

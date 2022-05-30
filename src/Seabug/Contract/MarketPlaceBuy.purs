@@ -8,7 +8,6 @@ import Contract.Prelude
 import Contract.Address
   ( getNetworkId
   , ownPaymentPubKeyHash
-  , payPubKeyHashBaseAddress
   )
 
 import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
@@ -37,7 +36,7 @@ import Contract.ProtocolParameters.Alonzo (minAdaTxOut)
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( BalancedSignedTransaction(BalancedSignedTransaction)
-  , TxOut
+  , TransactionOutput
   , balanceAndSignTx
   , submit
   )
@@ -53,9 +52,7 @@ import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
 import Data.BigInt (BigInt, fromInt)
-import Data.Identity (Identity(Identity))
 import Data.Map (insert, toUnfoldable)
-import Plutus.ToPlutusType (toPlutusType)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mintingPolicy)
 import Seabug.Token (mkTokenName)
@@ -65,7 +62,6 @@ import Seabug.Types
   , NftData(NftData)
   , NftId(NftId)
   )
-import Types.TokenName (TokenName)
 
 -- TODO docstring
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
@@ -112,6 +108,7 @@ mkMarketplaceTx (NftData nftData) = do
     ]
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
+    $ pure
     $ Value.scriptCurrencySymbol
     $ policy
   -- curr <- liftContractM "marketplaceBuy: Cannot get CurrencySymbol"
@@ -125,8 +122,10 @@ mkMarketplaceTx (NftData nftData) = do
     nft = nftData.nftId
     nft' = unwrap nft
     newNft = NftId nft' { owner = pkh }
-    scriptAddr =
-      typedValidatorEnterpriseAddress networkId $ wrap marketplaceValidator'
+  scriptAddr <-
+    liftedM "marketplaceBuy: Cannot convert validator hash to address"
+      $ pure
+      $ typedValidatorEnterpriseAddress networkId $ wrap marketplaceValidator'
   oldName <- liftedM "marketplaceBuy: Cannot hash old token" $ mkTokenName nft
   newName <- liftedM "marketplaceBuy: Cannot hash new token"
     $ mkTokenName newNft
@@ -137,12 +136,9 @@ mkMarketplaceTx (NftData nftData) = do
     valHash = marketplaceValidator'.validatorHash
     mintRedeemer = Redeemer $ toData $ ChangeOwner nft pkh
 
-    containsNft :: forall (a :: Type). (a /\ TxOut) -> Boolean
+    containsNft :: forall (a :: Type). (a /\ TransactionOutput) -> Boolean
     containsNft (_ /\ tx) =
-      let
-        (Identity amt) = toPlutusType (unwrap tx).amount
-      in
-        Value.valueOf amt curr oldName == one
+      Value.valueOf (unwrap tx).amount curr oldName == one
 
     getShare :: BigInt -> BigInt
     getShare share = (toBigInt nftPrice * share) `div` fromInt 10_000
@@ -167,11 +163,11 @@ mkMarketplaceTx (NftData nftData) = do
       - shareToSubtract authorShare
       - shareToSubtract daoShare
     datum = Datum $ toData $ curr /\ oldName
-  userAddr <- liftedM "marketplaceBuy: Cannot get user addr" $ getWalletAddress
+  userAddr <- liftedM "marketplaceBuy: Cannot get user addr" getWalletAddress
   userUtxos <-
-    liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt userAddr
+    liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt (unwrap userAddr).address
   scriptUtxos <-
-    liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt scriptAddr
+    liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt (unwrap scriptAddr).address
   utxo /\ utxoIndex <-
     liftContractM "marketplaceBuy: NFT not found on marketplace"
       $ Array.find containsNft

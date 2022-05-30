@@ -24,7 +24,7 @@ import Contract.Value
   )
 import Contract.Monad (Contract(Contract), mkHttpUrl)
 import Contract.Address (PaymentPubKeyHash, PubKeyHash)
-import Contract.Aeson (caseAesonObject, getField, jsonToAeson) as Aeson
+import Contract.Aeson as Aeson
 import Contract.PlutusData
   ( class FromData
   , class ToData
@@ -43,7 +43,6 @@ import Contract.Time (Slot)
 import Control.Monad.Reader.Trans (asks)
 import Data.Argonaut as Json
 import Data.Argonaut.Encode.Encoders (encodeString)
-import Data.Bifunctor (bimap, lmap)
 import Data.BigInt (BigInt, fromInt, toInt)
 import Partial.Unsafe (unsafePartial)
 import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
@@ -58,7 +57,7 @@ blake2bHash bytes = Contract $ do
       $ encodeString
       $ byteArrayToHex bytes
   liftAff (Affjax.post Affjax.ResponseFormat.json url reqBody)
-    <#> either (const Nothing) (hush <<< Json.decodeJson <<< _.body)
+    <#> either (const Nothing) (hush <<< Aeson.decodeAeson <<< Aeson.jsonToAeson <<< _.body)
 
 -- Field names have been simplified due to row polymorphism. Please let me know
 -- if the field names must be exact.
@@ -173,31 +172,25 @@ derive newtype instance Ord NftCollection
 
 -- Note the renaming of fields from their Plutus equivalents, e.g.
 -- "nftCollection'collectionNftCs" to "collectionNftCs".
-instance Json.DecodeJson NftCollection where
-  decodeJson j =
-    Json.caseJsonObject
+instance Aeson.DecodeAeson NftCollection where
+  decodeAeson j =
+    Aeson.caseAesonObject
       (Left $ Json.TypeMismatch "Expected Json Object")
       ( \o ->
           do
             collectionNftCs <- do
-              nftCs <- Json.getField o "nftCollection'collectionNftCs"
+              nftCs <- Aeson.getField o "nftCollection'collectionNftCs"
               note (Json.TypeMismatch "expected currency symbol")
                 $ mkCurrencySymbol
                 $ Cardano.Types.Value.getCurrencySymbol nftCs
 
-            lockLockupEnd <- Json.getField o "nftCollection'lockLockupEnd"
-            lockingScript <- Json.getField o "nftCollection'lockingScript"
-            author <- Json.getField o "nftCollection'author"
-            authorShare <- Json.getField o "nftCollection'authorShare"
-            daoScript <- Json.getField o "nftCollection'daoScript"
-            daoShare <- Json.getField o "nftCollection'daoShare"
-            -- Is the more efficient way to do this? Leave this until the end incase
-            -- we fail earlier.
-            let aeson = Aeson.jsonToAeson j
-            lockLockup <- Aeson.caseAesonObject
-              (Left $ Json.TypeMismatch "Expected Aeson Object")
-              (flip Aeson.getField "nftCollection'lockLockup")
-              aeson
+            lockLockupEnd <- Aeson.getField o "nftCollection'lockLockupEnd"
+            lockingScript <- Aeson.getField o "nftCollection'lockingScript"
+            author <- Aeson.getField o "nftCollection'author"
+            authorShare <- Aeson.getField o "nftCollection'authorShare"
+            daoScript <- Aeson.getField o "nftCollection'daoScript"
+            daoShare <- Aeson.getField o "nftCollection'daoShare"
+            lockLockup <- Aeson.getField o "nftCollection'lockLockup"
             pure $ NftCollection
               { collectionNftCs
               , lockLockup
@@ -388,13 +381,13 @@ instance Hashable CurrencySymbol where
   hash = hash <<< getCurrencySymbol
 
 instance Hashable TokenName where
-  hash = hash <<< getTokenName
+  hash = hash <<< unwrap <<< getTokenName
 
 instance Hashable ValidatorHash where
-  hash = hash <<< scriptHashToBytes <<< unwrap
+  hash = hash <<< unwrap <<< scriptHashToBytes <<< unwrap
 
 instance Hashable PaymentPubKeyHash where
-  hash = hash <<< ed25519KeyHashToBytes <<< unwrap <<< unwrap
+  hash = hash <<< unwrap <<< ed25519KeyHashToBytes <<< unwrap <<< unwrap
 
 instance (Hashable a, Hashable b) => Hashable (a /\ b) where
   hash (a /\ b) = ((<>) <$> hash a <*> hash b) >>= maybe (pure Nothing) hash
