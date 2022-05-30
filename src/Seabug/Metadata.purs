@@ -34,6 +34,7 @@ import Data.HTTP.Method (Method(GET))
 import Data.Newtype (unwrap)
 import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
+import Types.CborBytes (cborBytesToByteArray)
 
 type Hash = String
 
@@ -101,7 +102,7 @@ getMintingTxHash a =
 
 mkAsset :: CurrencySymbol -> TokenName -> String
 mkAsset currSym tname =
-  ((<>) `on` byteArrayToHex) (getCurrencySymbol currSym) (getTokenName tname)
+  ((<>) `on` byteArrayToHex) (getCurrencySymbol currSym) (cborBytesToByteArray $ getTokenName tname)
 
 decodeField
   :: forall (a :: Type)

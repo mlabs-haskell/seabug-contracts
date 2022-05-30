@@ -38,11 +38,7 @@ import Contract.Prim.ByteArray
   , byteArrayToHex
   )
 import Contract.Numeric.Natural (Natural, toBigInt)
-import Contract.Scripts
-  ( ValidatorHash
-  , ed25519KeyHashToBytes
-  , scriptHashToBytes
-  )
+import Contract.Scripts (ValidatorHash)
 import Contract.Time (Slot)
 import Control.Monad.Reader.Trans (asks)
 import Data.Argonaut as Json
@@ -50,6 +46,7 @@ import Data.Argonaut.Encode.Encoders (encodeString)
 import Data.Bifunctor (bimap, lmap)
 import Data.BigInt (BigInt, fromInt, toInt)
 import Partial.Unsafe (unsafePartial)
+import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
 
 blake2bHash :: forall (r :: Row Type). ByteArray -> Contract r (Maybe ByteArray)
 blake2bHash bytes = Contract $ do
