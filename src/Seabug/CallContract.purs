@@ -12,7 +12,6 @@ import Contract.Monad
   ( ConfigParams(ConfigParams)
   , ContractConfig
   , LogLevel
-  , defaultSlotConfig
   , mkContractConfig
   , runContract
   , runContract_
@@ -179,7 +178,6 @@ buildContractConfig cfg = do
         , secure: cfg.serverSecureConn
         }
     , networkId: networkId
-    , slotConfig: defaultSlotConfig
     , logLevel: cfg.logLevel
     , extraConfig: { projectId: cfg.projectId }
     , wallet
