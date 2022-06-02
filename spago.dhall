@@ -15,6 +15,7 @@ You can edit this file as you like.
   , "bigints"
   , "cardano-transaction-lib"
   , "control"
+  , "debug"
   , "effect"
   , "exceptions"
   , "http-methods"

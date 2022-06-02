@@ -1,4 +1,4 @@
-export function callMarketPlaceBuy(config: Config, args: ContractArgs):
+export function callMarketPlaceBuy(config: Config, args: BuyNftArgs):
     Promise<void>
 export function callMarketPlaceListNft(config: Config):
     Promise<Array<NftListing>>
@@ -24,12 +24,16 @@ export type Config = {
     datumCacheSecureConn: boolean,
     networkId: NetworkId,
     // blockfrost.io API key
-    projectId: string
+    projectId: string,
 }
 
 export type ContractArgs = {
     nftCollectionArgs: NftCollectionArgs,
     nftIdArgs: NftIdArgs
+}
+
+export type BuyNftArgs = {
+
 }
 
 export type NftCollectionArgs = {
@@ -41,9 +45,9 @@ export type NftCollectionArgs = {
     lockingScript: string,
     //PaymentPubKeyHash of the nft author
     author: string,
+    authorShare: bigint,
     // Validator hash
     daoScript: string,
-    authorShare: bigint,
     daoShare: bigint
 }
 

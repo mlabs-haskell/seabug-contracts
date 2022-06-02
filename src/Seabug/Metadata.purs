@@ -36,6 +36,8 @@ import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
 import Types.CborBytes (cborBytesToByteArray)
 
+import Debug (traceM)
+
 type Hash = String
 
 type FullSeabugMetadata =
@@ -49,6 +51,7 @@ getFullSeabugMetadata
   -> Contract (projectId :: String | r) (Either ClientError FullSeabugMetadata)
 getFullSeabugMetadata a@(currSym /\ _) = runExceptT $ do
   seabugMetadata <- getMintingTxSeabugMetadata currSym =<< getMintingTxHash a
+  log $ show seabugMetadata
   ipfsHash <- getIpfsHash seabugMetadata
   pure { seabugMetadata, ipfsHash }
 
@@ -111,12 +114,14 @@ decodeField
   => String
   -> Aeson.Aeson
   -> Either ClientError a
-decodeField field = lmap ClientDecodeJsonError <<<
-  ( Aeson.decodeAeson
-      <=< Aeson.caseAesonObject
-        (Left (Argonaut.TypeMismatch "Expected Object"))
-        (flip Aeson.getField field)
-  )
+decodeField field = do
+  traceM $ show field
+  lmap ClientDecodeJsonError <<<
+    ( Aeson.decodeAeson
+        <=< Aeson.caseAesonObject
+          (Left (Argonaut.TypeMismatch "Expected Object"))
+          (flip Aeson.getField field)
+    )
 
 decodeFieldJson
   :: forall (a :: Type)
