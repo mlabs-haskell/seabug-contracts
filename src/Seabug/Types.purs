@@ -44,21 +44,9 @@ import Control.Monad.Reader.Trans (asks)
 import Data.Argonaut as Json
 import Data.Argonaut.Encode.Encoders (encodeString)
 import Data.BigInt (BigInt, fromInt, toInt)
+import Hashing (blake2b256Hash)
 import Partial.Unsafe (unsafePartial)
 import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
-
-blake2bHash :: forall (r :: Row Type). ByteArray -> Contract r (Maybe ByteArray)
-blake2bHash bytes = Contract $ do
-  url <- asks $ (_ <> "/" <> "blake2b") <<< mkHttpUrl <<< _.serverConfig
-  let
-    reqBody :: Maybe Affjax.RequestBody.RequestBody
-    reqBody = Just
-      $ Affjax.RequestBody.Json
-      $ encodeString
-      $ byteArrayToHex bytes
-  liftAff (Affjax.post Affjax.ResponseFormat.json url reqBody)
-    <#> either (const Nothing)
-      (hush <<< Aeson.decodeAeson <<< Aeson.jsonToAeson <<< _.body)
 
 -- Field names have been simplified due to row polymorphism. Please let me know
 -- if the field names must be exact.
@@ -350,7 +338,7 @@ class Hashable (a :: Type) where
     -> Contract r (Maybe ByteArray) -- Plutus BuiltinByteString
 
 instance Hashable ByteArray where
-  hash = blake2bHash
+  hash = pure <<< Just <<< blake2b256Hash
 
 instance Hashable Natural where
   hash = hash <<< toBin <<< toBigInt
