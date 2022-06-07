@@ -36,7 +36,7 @@ import Contract.ProtocolParameters.Alonzo (minAdaTxOut)
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( BalancedSignedTransaction(BalancedSignedTransaction)
-  , TransactionOutput
+  , TransactionOutput(TransactionOutput)
   , balanceAndSignTx
   , submit
   )
@@ -130,16 +130,19 @@ mkMarketplaceTx (NftData nftData) = do
   oldName <- liftedM "marketplaceBuy: Cannot hash old token" $ mkTokenName nft
   newName <- liftedM "marketplaceBuy: Cannot hash new token"
     $ mkTokenName newNft
+  log $ "curr: " <> show curr
+  log $ "oldName: " <> show oldName 
+  log $ "newName: " <> show newName 
   let
     oldNftValue = Value.singleton curr oldName $ negate one
-    newNftValue = Value.singleton curr oldName one
+    newNftValue = Value.singleton curr newName one
     nftPrice = nft'.price
     valHash = marketplaceValidator'.validatorHash
     mintRedeemer = Redeemer $ toData $ ChangeOwner nft pkh
 
     containsNft :: forall (a :: Type). (a /\ TransactionOutput) -> Boolean
-    containsNft (_ /\ tx) =
-      Value.valueOf (unwrap tx).amount curr oldName == one
+    containsNft (_ /\ TransactionOutput out) =
+      Value.valueOf out.amount curr oldName == one
 
     getShare :: BigInt -> BigInt
     getShare share = (toBigInt nftPrice * share) `div` fromInt 10_000
@@ -171,6 +174,7 @@ mkMarketplaceTx (NftData nftData) = do
   scriptUtxos <-
     liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt
       (unwrap scriptAddr).address
+  log $ "scriptUtxos: " <> show scriptUtxos
   utxo /\ utxoIndex <-
     liftContractM "marketplaceBuy: NFT not found on marketplace"
       $ Array.find containsNft
