@@ -11,7 +11,6 @@ import Contract.Address (Slot(Slot))
 import Contract.Monad
   ( ConfigParams(ConfigParams)
   , ContractConfig
-  , LogLevel
   , mkContractConfig
   , runContract
   , runContract_
@@ -45,6 +44,7 @@ import Data.UInt as UInt
 import Effect (Effect)
 import Effect.Aff (error)
 import Effect.Class (liftEffect)
+import Data.Log.Level (LogLevel(..))
 import Effect.Exception (Error)
 import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
 import Metadata.Seabug.Share (unShare)
@@ -102,7 +102,7 @@ type ContractConfiguration =
   , datumCacheSecureConn :: Boolean
   , networkId :: Int
   , projectId :: String
-  , logLevel :: LogLevel
+  , logLevel :: String -- Trace | Debug | Info | Warn | Error
   }
 
 type BuyNftArgs =
@@ -159,6 +159,8 @@ buildContractConfig cfg = do
     $ UInt.fromInt' cfg.datumCachePort
   networkId <- liftM (error "Invalid network id")
     $ intToNetworkId cfg.networkId
+  logLevel <- liftM (error "Invalid log level")
+    $ stringToLogLevel cfg.logLevel
 
   wallet <- Just <$> mkNamiWalletAff
   mkContractConfig $ ConfigParams
@@ -178,10 +180,18 @@ buildContractConfig cfg = do
         , secure: cfg.serverSecureConn
         }
     , networkId: networkId
-    , logLevel: cfg.logLevel
+    , logLevel: logLevel
     , extraConfig: { projectId: cfg.projectId }
     , wallet
     }
+
+stringToLogLevel :: String -> Maybe LogLevel
+stringToLogLevel "Trace" = Just Trace
+stringToLogLevel "Debug" = Just Debug
+stringToLogLevel "Info" = Just Info
+stringToLogLevel "Warn" = Just Warn
+stringToLogLevel "Error" = Just Error
+stringToLogLevel _ = Nothing
 
 buildNftList :: NetworkId -> ListNftResult -> ListNftResultOut
 buildNftList
