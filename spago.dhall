@@ -17,6 +17,7 @@ You can edit this file as you like.
   , "control"
   , "debug"
   , "effect"
+  , "either"
   , "exceptions"
   , "http-methods"
   , "maybe"
