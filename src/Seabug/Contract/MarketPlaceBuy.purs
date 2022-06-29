@@ -5,26 +5,10 @@ module Seabug.Contract.MarketPlaceBuy
 
 import Contract.Prelude
 
-import Contract.Address
-  ( getNetworkId
-  , ownPaymentPubKeyHash
-  )
-
-import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
-import Contract.ScriptLookups
-  ( mintingPolicy
-  , validator
-  , ownPaymentPubKeyHash
-  , typedValidatorLookups
-  , unspentOutputs
-  ) as ScriptLookups
-import Contract.Monad
-  ( Contract
-  , liftContractM
-  , liftContractE
-  , liftedE
-  , liftedM
-  )
+import Cardano.Types.Value as Cardano.Types.Value
+import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
+import Contract.AuxiliaryData (setTxMetadata)
+import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.PlutusData
   ( Datum(Datum)
@@ -33,6 +17,14 @@ import Contract.PlutusData
   , unitRedeemer
   )
 import Contract.ProtocolParameters.Alonzo (minAdaTxOut)
+import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
+import Contract.ScriptLookups
+  ( mintingPolicy
+  , validator
+  , ownPaymentPubKeyHash
+  , typedValidatorLookups
+  , unspentOutputs
+  ) as ScriptLookups
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( BalancedSignedTransaction(BalancedSignedTransaction)
@@ -52,7 +44,11 @@ import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
 import Data.BigInt (BigInt, fromInt)
+import Data.BigInt as BigInt
 import Data.Map (insert, toUnfoldable)
+import Metadata.Seabug (SeabugMetadata(..))
+import Metadata.Seabug.Share (mkShare)
+import Partial.Unsafe (unsafePartial)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mintingPolicy)
 import Seabug.Token (mkTokenName)
@@ -62,6 +58,8 @@ import Seabug.Types
   , NftData(NftData)
   , NftId(NftId)
   )
+import Serialization.Hash (scriptHashFromBytes)
+import Types.RawBytes (hexToRawBytesUnsafe)
 
 -- TODO docstring
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
@@ -131,8 +129,8 @@ mkMarketplaceTx (NftData nftData) = do
   newName <- liftedM "marketplaceBuy: Cannot hash new token"
     $ mkTokenName newNft
   log $ "curr: " <> show curr
-  log $ "oldName: " <> show oldName 
-  log $ "newName: " <> show newName 
+  log $ "oldName: " <> show oldName
+  log $ "newName: " <> show newName
   let
     oldNftValue = Value.singleton curr oldName $ negate one
     newNftValue = Value.singleton curr newName one
@@ -214,4 +212,35 @@ mkMarketplaceTx (NftData nftData) = do
   -- the datums and redeemers will be reattached using a server with redeemers
   -- reindexed also.
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookup constraints
-  pure $ txDatumsRedeemerTxIns /\ curr /\ newName
+  collectionNftCS <- liftedM "Could not convert between currency symbols"
+    $ pure
+    $ Cardano.Types.Value.mkCurrencySymbol
+    $ Value.getCurrencySymbol nftCollection.collectionNftCs
+  let
+    natToShare nat = liftedM "Invalid share"
+      $ pure
+      $ mkShare
+      =<< BigInt.toInt (toBigInt nat)
+  authorShareValidated <- natToShare nftCollection.authorShare
+  marketplaceShareValidated <- natToShare nftCollection.daoShare
+  let
+    meta = SeabugMetadata
+      { policyId: wrap
+          $ unsafePartial
+          $ fromJust
+          $ scriptHashFromBytes
+          $ hexToRawBytesUnsafe
+              "00000000000000000000000000000000000000000000000000000000"
+      , mintPolicy: mempty
+      , collectionNftCS
+      , lockingScript: nftCollection.lockingScript
+      , collectionNftTN: nft'.collectionNftTn
+      , authorPkh: unwrap nftCollection.author
+      , authorShare: authorShareValidated
+      , marketplaceScript: nftCollection.daoScript
+      , marketplaceShare: marketplaceShareValidated
+      , ownerPkh: unwrap nft'.owner
+      , ownerPrice: nft'.price
+      }
+  txWithMetadata <- setTxMetadata txDatumsRedeemerTxIns meta
+  pure $ txWithMetadata /\ curr /\ newName
