@@ -53,6 +53,7 @@ import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
+import Data.String.Common (joinWith)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mintingPolicy)
 import Seabug.Token (mkTokenName)
@@ -98,6 +99,16 @@ mkMarketplaceTx (NftData nftData) = do
   pkh <- liftedM "marketplaceBuy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
   policy' <- liftedE $ pure mintingPolicy
+  log $ "unapplied-policy: " <> show policy'
+
+  log $ "policy args: " <> joinWith "; "
+    [ "collectionNftCs: " <> show nftCollection.collectionNftCs
+    , "lockingScript: " <> show nftCollection.lockingScript
+    , "author: " <> show nftCollection.author
+    , "authorShare: " <> show nftCollection.authorShare
+    , "daoScript: " <> show nftCollection.daoScript
+    , "daoShare: " <> show nftCollection.daoShare
+    ]
   policy <- liftedE $ applyArgs policy'
     [ toData nftCollection.collectionNftCs
     , toData nftCollection.lockingScript
@@ -106,6 +117,7 @@ mkMarketplaceTx (NftData nftData) = do
     , toData nftCollection.daoScript
     , toData nftCollection.daoShare
     ]
+  log $ "policy: " <> show policy
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
     $ pure
