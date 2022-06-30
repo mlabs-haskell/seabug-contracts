@@ -55,7 +55,7 @@ import Seabug.Token (mkTokenName)
 import Seabug.Types
   ( MarketplaceDatum(MarketplaceDatum)
   , MintAct(ChangeOwner)
-  , NftData(NftData)
+  , NftData(..)
   , NftId(NftId)
   )
 import Serialization.Hash (scriptHashFromBytes)
@@ -212,35 +212,45 @@ mkMarketplaceTx (NftData nftData) = do
   -- the datums and redeemers will be reattached using a server with redeemers
   -- reindexed also.
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookup constraints
-  collectionNftCS <- liftedM "Could not convert between currency symbols"
-    $ pure
-    $ Cardano.Types.Value.mkCurrencySymbol
-    $ Value.getCurrencySymbol nftCollection.collectionNftCs
+  txWithMetadata <-
+    setSeabugMetadata (wrap nftData { nftId = newNft }) txDatumsRedeemerTxIns
+  pure $ txWithMetadata /\ curr /\ newName
+
+-- | Set metadata on the transaction for the given NFT
+setSeabugMetadata
+  :: forall (r :: Row Type)
+   . NftData
+  -> UnattachedUnbalancedTx
+  -> Contract r UnattachedUnbalancedTx
+setSeabugMetadata (NftData nftData) tx = do
   let
+    nftCollection = unwrap nftData.nftCollection
+    nftId = unwrap nftData.nftId
     natToShare nat = liftedM "Invalid share"
       $ pure
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
+  collectionNftCS <- liftedM "Could not convert between currency symbols"
+    $ pure
+    $ Cardano.Types.Value.mkCurrencySymbol
+    $ Value.getCurrencySymbol nftCollection.collectionNftCs
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
-  let
-    meta = SeabugMetadata
-      { policyId: wrap
-          $ unsafePartial
-          $ fromJust
-          $ scriptHashFromBytes
-          $ hexToRawBytesUnsafe
-              "00000000000000000000000000000000000000000000000000000000"
-      , mintPolicy: mempty
-      , collectionNftCS
-      , lockingScript: nftCollection.lockingScript
-      , collectionNftTN: nft'.collectionNftTn
-      , authorPkh: unwrap nftCollection.author
-      , authorShare: authorShareValidated
-      , marketplaceScript: nftCollection.daoScript
-      , marketplaceShare: marketplaceShareValidated
-      , ownerPkh: unwrap nft'.owner
-      , ownerPrice: nft'.price
-      }
-  txWithMetadata <- setTxMetadata txDatumsRedeemerTxIns meta
-  pure $ txWithMetadata /\ curr /\ newName
+  setTxMetadata tx $ SeabugMetadata
+    { policyId: wrap
+        $ unsafePartial
+        $ fromJust
+        $ scriptHashFromBytes
+        $ hexToRawBytesUnsafe
+            "00000000000000000000000000000000000000000000000000000000"
+    , mintPolicy: mempty
+    , collectionNftCS
+    , lockingScript: nftCollection.lockingScript
+    , collectionNftTN: nftId.collectionNftTn
+    , authorPkh: unwrap nftCollection.author
+    , authorShare: authorShareValidated
+    , marketplaceScript: nftCollection.daoScript
+    , marketplaceShare: marketplaceShareValidated
+    , ownerPkh: unwrap nftId.owner
+    , ownerPrice: nftId.price
+    }
