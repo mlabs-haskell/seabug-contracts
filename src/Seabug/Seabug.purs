@@ -3,13 +3,13 @@ module Seabug
   , getWalletBalance
   ) where
 
-import Prelude
+import Prelude (bind, ($))
 
 import Control.Promise (Promise, fromAff)
 import Data.Maybe (Maybe)
 import Effect (Effect)
 import QueryM (callNami)
-import Seabug.CallContract
+import Seabug.CallContract (callMarketPlaceBuy, callMarketPlaceBuyTest, callMarketPlaceListNft)
 import Serialization.Types (Value)
 import Wallet (Wallet(..), mkNamiWalletAff)
 

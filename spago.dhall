@@ -11,6 +11,7 @@ You can edit this file as you like.
   , "argonaut"
   , "argonaut-codecs"
   , "arrays"
+  , "monad-logger"
   , "bifunctors"
   , "bigints"
   , "cardano-transaction-lib"

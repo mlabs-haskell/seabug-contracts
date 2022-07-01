@@ -31,6 +31,9 @@
         pkgs.purescriptProject {
           inherit pkgs src;
           projectName = "seabug-contracts";
+          shell = {
+            packages = [ pkgs.fd ];
+          };
         };
     in
     {
