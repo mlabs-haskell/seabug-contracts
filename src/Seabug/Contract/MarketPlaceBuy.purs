@@ -223,12 +223,10 @@ setSeabugMetadata (NftData nftData) tx = do
   let
     nftCollection = unwrap nftData.nftCollection
     nftId = unwrap nftData.nftId
-    natToShare nat = liftedM "Invalid share"
-      $ pure
+    natToShare nat = liftContractM "Invalid share"
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
-  collectionNftCS <- liftedM "Could not convert between currency symbols"
-    $ pure
+  collectionNftCS <- liftContractM "Could not convert between currency symbols"
     $ Cardano.Types.Value.mkCurrencySymbol
     $ Value.getCurrencySymbol nftCollection.collectionNftCs
   authorShareValidated <- natToShare nftCollection.authorShare
@@ -236,8 +234,8 @@ setSeabugMetadata (NftData nftData) tx = do
   policyId <-
     -- Note: I don't think this should fail, newer versions of CTL
     -- guarantee it won't fail
-    liftedM "Could not convert collection NFT currency symbol to script hash"
-      $ pure
+    liftContractM
+      "Could not convert collection NFT currency symbol to script hash"
       $ Value.currencyMPSHash nftCollection.collectionNftCs
   setTxMetadata tx $ SeabugMetadata
     { policyId
