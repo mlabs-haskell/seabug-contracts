@@ -143,8 +143,8 @@ mkMarketplaceTx (NftData nftData) = do
   newName <- liftedM "marketplaceBuy: Cannot hash new token"
     $ mkTokenName newNft
   log $ "curr: " <> show curr
-  log $ "oldName: " <> show oldName 
-  log $ "newName: " <> show newName 
+  log $ "oldName: " <> show oldName
+  log $ "newName: " <> show newName
   let
     oldNftValue = Value.singleton curr oldName $ negate one
     newNftValue = Value.singleton curr newName one
