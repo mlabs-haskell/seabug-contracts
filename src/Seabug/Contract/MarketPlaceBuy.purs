@@ -48,7 +48,6 @@ import Data.BigInt as BigInt
 import Data.Map (insert, toUnfoldable)
 import Metadata.Seabug (SeabugMetadata(..))
 import Metadata.Seabug.Share (mkShare)
-import Partial.Unsafe (unsafePartial)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mintingPolicy)
 import Seabug.Token (mkTokenName)
@@ -59,7 +58,6 @@ import Seabug.Types
   , NftId(NftId)
   )
 import Serialization.Hash (scriptHashFromBytes)
-import Types.RawBytes (hexToRawBytesUnsafe)
 
 -- TODO docstring
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
@@ -230,19 +228,20 @@ setSeabugMetadata (NftData nftData) tx = do
       $ pure
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
+    collectionNftCSBytes = Value.getCurrencySymbol nftCollection.collectionNftCs
   collectionNftCS <- liftedM "Could not convert between currency symbols"
     $ pure
     $ Cardano.Types.Value.mkCurrencySymbol
-    $ Value.getCurrencySymbol nftCollection.collectionNftCs
+    $ collectionNftCSBytes
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
+  policyId <-
+    liftedM "Could not convert collection NFT currency symbol to script hash"
+      $ pure
+      $ wrap
+      <$> scriptHashFromBytes (wrap collectionNftCSBytes)
   setTxMetadata tx $ SeabugMetadata
-    { policyId: wrap
-        $ unsafePartial
-        $ fromJust
-        $ scriptHashFromBytes
-        $ hexToRawBytesUnsafe
-            "00000000000000000000000000000000000000000000000000000000"
+    { policyId
     , mintPolicy: mempty
     , collectionNftCS
     , lockingScript: nftCollection.lockingScript
