@@ -57,7 +57,6 @@ import Seabug.Types
   , NftData(..)
   , NftId(NftId)
   )
-import Serialization.Hash (scriptHashFromBytes)
 
 -- TODO docstring
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
@@ -228,18 +227,18 @@ setSeabugMetadata (NftData nftData) tx = do
       $ pure
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
-    collectionNftCSBytes = Value.getCurrencySymbol nftCollection.collectionNftCs
   collectionNftCS <- liftedM "Could not convert between currency symbols"
     $ pure
     $ Cardano.Types.Value.mkCurrencySymbol
-    $ collectionNftCSBytes
+    $ Value.getCurrencySymbol nftCollection.collectionNftCs
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
   policyId <-
+    -- Note: I don't think this should fail, newer versions of CTL
+    -- guarantee it won't fail
     liftedM "Could not convert collection NFT currency symbol to script hash"
       $ pure
-      $ wrap
-      <$> scriptHashFromBytes (wrap collectionNftCSBytes)
+      $ Value.currencyMPSHash nftCollection.collectionNftCs
   setTxMetadata tx $ SeabugMetadata
     { policyId
     , mintPolicy: mempty
