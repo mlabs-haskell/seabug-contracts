@@ -37,7 +37,7 @@ import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( BalancedSignedTransaction(BalancedSignedTransaction)
   , TransactionOutput(TransactionOutput)
-  , balanceAndSignTx
+  , balanceAndSignTx, balanceAndSignTxE
   , submit
   )
 import Contract.TxConstraints
@@ -51,6 +51,7 @@ import Contract.Utxos (utxosAt)
 import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
+import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
 import Data.String.Common (joinWith)
@@ -73,10 +74,14 @@ marketplaceBuy nftData = do
   -- 2) Reindex `Spend` redeemers after finalising transaction inputs.
   -- 3) Attach datums and redeemers to transaction.
   -- 3) Sign tx, returning the Cbor-hex encoded `ByteArray`.
-  signedTx <- liftedM
-    "marketplaceBuy: Cannot balance, reindex redeemers, attach datums/redeemers\
-    \ and sign"
-    (balanceAndSignTx unattachedBalancedTx)
+  log $ "unattachedBalancedTx: " <> show unattachedBalancedTx
+  log $ "curr: " <> show curr <> " newName: " <> show newName
+  signedTx <- liftedE (
+    lmap
+      (\e -> "marketplaceBuy: Cannot balance, reindex redeemers, attach datums/redeemers\
+             \ and sign: " <> show e)
+      <$> balanceAndSignTxE unattachedBalancedTx)
+  log $ "signedTx: " <> show signedTx
   -- Submit transaction using Cbor-hex encoded `ByteArray`
   transactionHash <- submit signedTx
   log $ "marketplaceBuy: Transaction successfully submitted with hash: "
@@ -189,11 +194,12 @@ mkMarketplaceTx (NftData nftData) = do
       $ toUnfoldable
       $ unwrap scriptUtxos
   let
+    utxosForTx = insert utxo utxoIndex $ unwrap userUtxos
     lookup = mconcat
       [ ScriptLookups.mintingPolicy policy
       , ScriptLookups.typedValidatorLookups $ wrap marketplaceValidator'
       , ScriptLookups.validator marketplaceValidator'.validator
-      , ScriptLookups.unspentOutputs $ insert utxo utxoIndex $ unwrap userUtxos
+      , ScriptLookups.unspentOutputs utxosForTx
       , ScriptLookups.ownPaymentPubKeyHash pkh
       ]
 
@@ -218,6 +224,7 @@ mkMarketplaceTx (NftData nftData) = do
               ( newNftValue <> minAdaVal
               )
           ]
+  log $ "utxosTx: " <> show utxosForTx
   -- Created unbalanced tx which stripped datums and redeemers with tx inputs,
   -- the datums and redeemers will be reattached using a server with redeemers
   -- reindexed also.
