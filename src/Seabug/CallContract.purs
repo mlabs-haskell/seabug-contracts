@@ -49,7 +49,7 @@ import Effect.Exception (Error)
 import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Seabug.Metadata.Share (unShare)
 import Partial.Unsafe (unsafePartial)
-import Plutus.FromPlutusType (fromPlutusType)
+import Plutus.Conversion (fromPlutusAddress)
 import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
 import Seabug.Contract.MarketPlaceListNft (ListNftResult, marketPlaceListNft)
 import Seabug.Types
@@ -66,6 +66,7 @@ import Serialization.Hash
   )
 import Types.Natural as Nat
 import Wallet (mkNamiWalletAff)
+import Types.BigNum as BigNum
 
 -- | Exists temporarily for testing purposes
 callMarketPlaceBuyTest :: String -> Effect (Promise String)
@@ -202,8 +203,7 @@ buildNftList
     inputIndex = UInt.toInt input.index
     -- TODO: What do we do if this fails?
     address =
-      addressBech32 $ unsafePartial $ fromJust $ fromPlutusType $ network /\
-        output.address
+      addressBech32 $ unsafePartial $ fromPlutusAddress network output.address
     dataHash = fromMaybe mempty $ byteArrayToHex <<< unwrap <$> output.dataHash
     ipfsHash = metadata.ipfsHash
     seabugMetadata = convertSeabugMetaData metadata.seabugMetadata
@@ -221,7 +221,7 @@ buildNftList
     -> { currencySymbol :: String, tokenName :: String, amount :: BigInt }
   mkValueRecord (currencySymbol /\ tokenName /\ amount) =
     { currencySymbol: byteArrayToHex $ getCurrencySymbol currencySymbol
-    , tokenName: byteArrayToHex $ unwrap $ getTokenName tokenName
+    , tokenName: byteArrayToHex $ getTokenName tokenName
     , amount
     }
 
@@ -231,7 +231,7 @@ buildNftList
     , mintPolicy: byteArrayToHex m.mintPolicy
     , collectionNftCS: byteArrayToHex $ Cardano.Types.Value.getCurrencySymbol $
         m.collectionNftCS
-    , collectionNftTN: byteArrayToHex $ unwrap $ getTokenName m.collectionNftTN
+    , collectionNftTN: byteArrayToHex $ getTokenName m.collectionNftTN
     , lockingScript: scriptHashToBech32Unsafe "script" $ unwrap m.lockingScript
     , authorPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap
         m.authorPkh
@@ -273,7 +273,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
     lockLockupEnd <-
       note (error $ "Invalid nft lockLockupEnd: " <> show r.lockLockupEnd)
         $ Slot
-        <$> (UInt.fromString $ BigInt.toString r.lockLockupEnd)
+        <$> (BigNum.fromString $ BigInt.toString r.lockLockupEnd)
     lockingScript <-
       note (error $ "Invalid nft lockingScript: " <> r.lockingScript)
         $ wrap

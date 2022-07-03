@@ -4,7 +4,7 @@ import Contract.Prelude
 
 import Contract.Monad
   ( Contract
-  , defaultContractConfig
+  , defaultTestnetContractConfig
   , liftContractM
   , runContract_
   )
@@ -25,10 +25,11 @@ import Seabug.Types
   , NftId(NftId)
   )
 import Serialization.Hash (ed25519KeyHashFromBytes, scriptHashFromBytes)
+import Types.BigNum as BigNum
 
 main :: Effect Unit
 main = launchAff_ $ do
-  cfg <- defaultContractConfig
+  cfg <- defaultTestnetContractConfig
   runContract_ cfg $ do
     marketplaceBuy =<< testNftData
 
@@ -65,7 +66,7 @@ testNftData = do
     { nftCollection: NftCollection
         { collectionNftCs
         , lockLockup: BigInt.fromInt 5
-        , lockLockupEnd: Slot $ UInt.fromInt 5
+        , lockLockupEnd: Slot $ BigNum.fromInt 5
         , lockingScript: wrap lockingScript
         , author: wrap $ wrap kh
         , authorShare: fromBigInt' $ BigInt.fromInt 1000

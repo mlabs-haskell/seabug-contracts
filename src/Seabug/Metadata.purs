@@ -106,7 +106,7 @@ getMintingTxHash a =
 mkAsset :: CurrencySymbol -> TokenName -> String
 mkAsset currSym tname =
   ((<>) `on` byteArrayToHex) (getCurrencySymbol currSym)
-    (cborBytesToByteArray $ getTokenName tname)
+    (getTokenName tname)
 
 decodeField
   :: forall (a :: Type)

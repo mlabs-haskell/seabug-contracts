@@ -338,7 +338,7 @@ class Hashable (a :: Type) where
     -> Contract r (Maybe ByteArray) -- Plutus BuiltinByteString
 
 instance Hashable ByteArray where
-  hash = pure <<< Just <<< blake2b256Hash
+  hash = map Just <<< liftAff <<< blake2b256Hash
 
 instance Hashable Natural where
   hash = hash <<< toBin <<< toBigInt
@@ -370,7 +370,7 @@ instance Hashable CurrencySymbol where
   hash = hash <<< getCurrencySymbol
 
 instance Hashable TokenName where
-  hash = hash <<< unwrap <<< getTokenName
+  hash = hash <<< getTokenName
 
 instance Hashable ValidatorHash where
   hash = hash <<< unwrap <<< scriptHashToBytes <<< unwrap

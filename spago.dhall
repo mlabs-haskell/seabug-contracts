@@ -5,6 +5,7 @@ You can edit this file as you like.
 { name = "my-project"
 , dependencies =
   [ "aeson"
+  , "aeson-helpers"
   , "aff"
   , "aff-promise"
   , "affjax"
@@ -29,8 +30,9 @@ You can edit this file as you like.
   , "ordered-collections"
   , "partial"
   , "prelude"
-  , "strings"
   , "spec"
+  , "strings"
+  , "text-encoding"
   , "transformers"
   , "tuples"
   , "uint"

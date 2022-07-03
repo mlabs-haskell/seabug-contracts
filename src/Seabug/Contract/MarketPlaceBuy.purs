@@ -32,7 +32,7 @@ import Contract.PlutusData
   , toData
   , unitRedeemer
   )
-import Contract.ProtocolParameters.Alonzo (minAdaTxOut)
+import Contract.ProtocolParameters.Alonzo (utxoEntrySizeWithoutVal)
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( BalancedSignedTransaction(BalancedSignedTransaction)
@@ -73,12 +73,12 @@ marketplaceBuy nftData = do
   -- 2) Reindex `Spend` redeemers after finalising transaction inputs.
   -- 3) Attach datums and redeemers to transaction.
   -- 3) Sign tx, returning the Cbor-hex encoded `ByteArray`.
-  BalancedSignedTransaction { signedTxCbor } <- liftedM
+  signedTx <- liftedM
     "marketplaceBuy: Cannot balance, reindex redeemers, attach datums/redeemers\
     \ and sign"
     (balanceAndSignTx unattachedBalancedTx)
   -- Submit transaction using Cbor-hex encoded `ByteArray`
-  transactionHash <- submit signedTxCbor
+  transactionHash <- submit signedTx
   log $ "marketplaceBuy: Transaction successfully submitted with hash: "
     <> show transactionHash
   log $ "marketplaceBuy: Buy successful: " <> show (curr /\ newName)
@@ -120,9 +120,7 @@ mkMarketplaceTx (NftData nftData) = do
   log $ "policy: " <> show policy
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
-    $ pure
-    $ Value.scriptCurrencySymbol
-    $ policy
+    $ liftAff $ Value.scriptCurrencySymbol policy
   -- curr <- liftContractM "marketplaceBuy: Cannot get CurrencySymbol"
   --   $ mkCurrencySymbol
   --   $ Value.getCurrencySymbol currSym
@@ -161,7 +159,7 @@ mkMarketplaceTx (NftData nftData) = do
 
     shareToSubtract :: BigInt -> BigInt
     shareToSubtract v
-      | v < unwrap minAdaTxOut = zero
+      | v < utxoEntrySizeWithoutVal = zero
       | otherwise = v
 
     filterLowValue
@@ -169,7 +167,7 @@ mkMarketplaceTx (NftData nftData) = do
       -> (Value.Value -> TxConstraints Unit Unit)
       -> TxConstraints Unit Unit
     filterLowValue v t
-      | v < unwrap minAdaTxOut = mempty
+      | v < utxoEntrySizeWithoutVal = mempty
       | otherwise = t (Value.lovelaceValueOf v)
 
     authorShare = getShare $ toBigInt nftCollection.authorShare
@@ -181,11 +179,9 @@ mkMarketplaceTx (NftData nftData) = do
     datum = Datum $ toData $ curr /\ oldName
   userAddr <- liftedM "marketplaceBuy: Cannot get user addr" getWalletAddress
   userUtxos <-
-    liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt
-      (unwrap userAddr).address
+    liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt userAddr
   scriptUtxos <-
-    liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt
-      (unwrap scriptAddr).address
+    liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt scriptAddr
   log $ "scriptUtxos: " <> show scriptUtxos
   utxo /\ utxoIndex <-
     liftContractM "marketplaceBuy: NFT not found on marketplace"
