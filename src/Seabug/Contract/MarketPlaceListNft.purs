@@ -17,6 +17,8 @@ import Contract.Utxos (utxosAt)
 import Contract.Value (valueOf)
 import Control.Alternative (guard)
 import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
+import Control.Monad.Reader (asks)
+import Control.Parallel (parTraverse)
 import Data.Array (catMaybes, mapMaybe)
 import Data.Map as Map
 import Seabug.MarketPlace (marketplaceValidator)
@@ -38,6 +40,7 @@ marketPlaceListNft
 marketPlaceListNft = do
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
   networkId <- getNetworkId
+  projectId <- asks $ unwrap >>> _.projectId
   scriptAddr <-
     liftedM "marketPlaceListNft: Cannot convert validator hash to address"
       $ pure
@@ -48,7 +51,7 @@ marketPlaceListNft = do
       (utxosAt (unwrap scriptAddr).address)
   datums <- getDatumsByHashes
     $ mapMaybe (snd >>> unwrap >>> _.dataHash) scriptUtxos
-  withMetadata <- for scriptUtxos $
+  withMetadata <- liftAff $ (flip parTraverse) scriptUtxos $
     \(input /\ output@(TransactionOutput out)) ->
       runMaybeT $ do
         datumHash <- MaybeT $ pure $ out.dataHash
@@ -56,6 +59,7 @@ marketPlaceListNft = do
         MarketplaceDatum { getMarketplaceDatum: curr /\ name } <-
           MaybeT $ pure $ fromData $ unwrap plutusData
         guard $ valueOf out.amount curr name == one
-        metadata <- MaybeT $ map hush $ getFullSeabugMetadata $ curr /\ name
+        metadata <- MaybeT $ map hush $
+          getFullSeabugMetadata (curr /\ name) projectId
         pure { input, output, metadata }
   pure $ catMaybes withMetadata

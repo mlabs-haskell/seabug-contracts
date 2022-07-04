@@ -11,7 +11,6 @@ import Affjax as Affjax
 import Affjax.RequestHeader as Affjax.RequestHeader
 import Affjax.ResponseFormat as Affjax.ResponseFormat
 import Cardano.Types.Value as Cardano.Types.Value
-import Contract.Monad (Contract)
 import Contract.Prim.ByteArray (byteArrayToHex)
 import Contract.Transaction
   ( ClientError(ClientHttpError, ClientDecodeJsonError)
@@ -25,18 +24,16 @@ import Contract.Value
   )
 import Control.Alternative (guard)
 import Control.Monad.Except.Trans (ExceptT(ExceptT), except, runExceptT)
+import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Monad.Reader.Trans (asks)
 import Control.Monad.Trans.Class (lift)
 import Data.Argonaut as Argonaut
 import Data.Bifunctor (bimap, lmap)
 import Data.Function (on)
 import Data.HTTP.Method (Method(GET))
-import Data.Newtype (unwrap)
 import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
 import Types.CborBytes (cborBytesToByteArray)
-
-import Debug (traceM)
 
 type Hash = String
 
@@ -45,20 +42,25 @@ type FullSeabugMetadata =
   , ipfsHash :: Hash
   }
 
+type BlockfrostFetch a = ExceptT ClientError
+  (ReaderT { projectId :: String } Aff)
+  a
+
 getFullSeabugMetadata
-  :: forall (r :: Row Type)
-   . CurrencySymbol /\ TokenName
-  -> Contract (projectId :: String | r) (Either ClientError FullSeabugMetadata)
-getFullSeabugMetadata a@(currSym /\ _) = runExceptT $ do
-  seabugMetadata <- getMintingTxSeabugMetadata currSym =<< getMintingTxHash a
-  log $ show seabugMetadata
-  ipfsHash <- getIpfsHash seabugMetadata
-  pure { seabugMetadata, ipfsHash }
+  :: CurrencySymbol /\ TokenName
+  -> String
+  -> Aff (Either ClientError FullSeabugMetadata)
+getFullSeabugMetadata a@(currSym /\ _) projectId =
+  flip runReaderT { projectId } <<< runExceptT $ do
+    seabugMetadata <- getMintingTxSeabugMetadata currSym =<<
+      getMintingTxHash
+        a
+    ipfsHash <- getIpfsHash seabugMetadata
+    pure { seabugMetadata, ipfsHash }
 
 getIpfsHash
-  :: forall (r :: Row Type)
-   . SeabugMetadata
-  -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
+  :: SeabugMetadata
+  -> BlockfrostFetch Hash
 getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
   except <<< (decodeField "image" <=< decodeFieldJson "onchain_metadata")
     =<< mkGetRequest ("assets/" <> mkAsset curr collectionNftTN)
@@ -71,7 +73,7 @@ getMintingTxSeabugMetadata
   :: forall (r :: Row Type)
    . CurrencySymbol
   -> Hash
-  -> ExceptT ClientError (Contract (projectId :: String | r)) SeabugMetadata
+  -> BlockfrostFetch SeabugMetadata
 getMintingTxSeabugMetadata currSym txHash = do
   res <- mkGetRequest $ "txs/" <> txHash <> "/metadata"
   ms <- except
@@ -98,7 +100,7 @@ getMintingTxSeabugMetadata currSym txHash = do
 getMintingTxHash
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName
-  -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
+  -> BlockfrostFetch Hash
 getMintingTxHash a =
   except <<< decodeFieldJson "initial_mint_tx_hash"
     =<< mkGetRequest ("assets/" <> uncurry mkAsset a)
@@ -115,7 +117,6 @@ decodeField
   -> Aeson.Aeson
   -> Either ClientError a
 decodeField field = do
-  traceM $ show field
   lmap ClientDecodeJsonError <<<
     ( Aeson.decodeAeson
         <=< Aeson.caseAesonObject
@@ -134,9 +135,9 @@ decodeFieldJson field = decodeField field <<< Aeson.jsonToAeson
 mkGetRequest
   :: forall (r :: Row Type)
    . String
-  -> ExceptT ClientError (Contract (projectId :: String | r)) Argonaut.Json
+  -> BlockfrostFetch Argonaut.Json
 mkGetRequest path = do
-  projectId <- lift $ asks $ _.projectId <<< unwrap
+  projectId <- lift $ asks $ _.projectId
   let
     req :: Affjax.Request Argonaut.Json
     req = Affjax.defaultRequest
