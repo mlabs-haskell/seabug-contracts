@@ -32,7 +32,7 @@ import Contract.PlutusData
   , toData
   , unitRedeemer
   )
-import Contract.ProtocolParameters.Alonzo (utxoEntrySizeWithoutVal)
+import Constants.Babbage (utxoEntrySizeWithoutVal)
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( BalancedSignedTransaction(BalancedSignedTransaction)

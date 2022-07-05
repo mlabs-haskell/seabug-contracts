@@ -327,7 +327,9 @@ let additions =
             , "variant"
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
-        , version = "b7e9c30c9b3b1d588f4f2a43fbb3bdf7e394a5d5"
+          -- https://github.com/Plutonomicon/cardano-transaction-lib/pull/696
+          -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
+        , version = "b7614b4e11a57b5b366b65509b86eb4b086bb1ce"
         }
       }
-in  upstream // additions
+in upstream // additions
