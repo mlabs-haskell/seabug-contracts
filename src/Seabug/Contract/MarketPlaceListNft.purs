@@ -22,7 +22,7 @@ import Control.Parallel (parTraverse)
 import Data.Array (catMaybes, mapMaybe)
 import Data.Map as Map
 import Seabug.MarketPlace (marketplaceValidator)
-import Seabug.Metadata (FullSeabugMetadata, getFullSeabugMetadata)
+import Seabug.Metadata (FullSeabugMetadata, getFullSeabugMetadataWithBackoff)
 import Seabug.Types (MarketplaceDatum(MarketplaceDatum))
 
 type ListNftResult =
@@ -60,6 +60,6 @@ marketPlaceListNft = do
           MaybeT $ pure $ fromData $ unwrap plutusData
         guard $ valueOf out.amount curr name == one
         metadata <- MaybeT $ map hush $
-          getFullSeabugMetadata (curr /\ name) projectId
+          getFullSeabugMetadataWithBackoff (curr /\ name) projectId
         pure { input, output, metadata }
   pure $ catMaybes withMetadata

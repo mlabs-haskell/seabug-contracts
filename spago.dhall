@@ -26,6 +26,7 @@ You can edit this file as you like.
   , "parallel"
   , "partial"
   , "prelude"
+  , "random"
   , "transformers"
   , "tuples"
   , "uint"

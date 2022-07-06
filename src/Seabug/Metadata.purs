@@ -3,6 +3,7 @@ module Seabug.Metadata
   , FullSeabugMetadata
   , Hash
   , getFullSeabugMetadata
+  , getFullSeabugMetadataWithBackoff
   ) where
 
 import Contract.Prelude
@@ -31,6 +32,8 @@ import Data.Argonaut as Argonaut
 import Data.Bifunctor (lmap)
 import Data.Function (on)
 import Data.HTTP.Method (Method(GET))
+import Effect.Aff (delay)
+import Effect.Random (randomRange)
 import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
 import Types.CborBytes (cborBytesToByteArray)
@@ -54,6 +57,32 @@ instance Show BlockfrostFetchError where
 type BlockfrostFetch a = ExceptT BlockfrostFetchError
   (ReaderT { projectId :: String } Aff)
   a
+
+-- | Tries to get the metadata for the given asset using
+-- | Blockfrost. If the rate limit is hit, retries after a random
+-- | delay, up to 5 times. Uses a very simple back-off mechanism.
+-- | Instead of relying on this, refactor so the rate limit isn't hit.
+getFullSeabugMetadataWithBackoff
+  :: CurrencySymbol /\ TokenName
+  -> String
+  -> Aff (Either BlockfrostFetchError FullSeabugMetadata)
+getFullSeabugMetadataWithBackoff asset projectId = go 1.0
+  where
+  go n = do
+    r <- getFullSeabugMetadata asset projectId
+    case r of
+      Left BlockfrostRateLimit
+        | n < 5.0 -> do
+            let n' = n + 1.0
+            log "Blockfrost rate limit hit, backing off"
+            -- Wait a random amount of time in the range of [1, 3 *
+            -- (attempt + 1)) seconds, this is just a heuristic based
+            -- on my testing
+            delay <<< wrap <<< (_ * 1000.0) =<<
+              (liftEffect $ randomRange 1.0 (3.0 * n'))
+            log $ "Retrying, attempt " <> show n'
+            go n'
+      _ -> pure r
 
 getFullSeabugMetadata
   :: CurrencySymbol /\ TokenName
