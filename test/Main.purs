@@ -8,10 +8,7 @@ import Test.Util (interpret)
 import TestM (TestPlanM)
 
 main :: Effect Unit
-main = launchAff_ do
-  interpret do
-    unitTestPlan
+main = launchAff_ $ interpret unitTestPlan
 
 unitTestPlan :: TestPlanM Unit
-unitTestPlan = do
-  Metadata.suite
+unitTestPlan = Metadata.suite
