@@ -32,9 +32,10 @@ import Data.Argonaut as Argonaut
 import Data.Bifunctor (lmap)
 import Data.Function (on)
 import Data.HTTP.Method (Method(GET))
+import Data.Newtype (unwrap)
 import Effect.Aff (delay)
 import Effect.Random (randomRange)
-import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
+import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
 import Types.CborBytes (cborBytesToByteArray)
 
