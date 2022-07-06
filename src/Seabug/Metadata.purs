@@ -32,7 +32,7 @@ import Data.Bifunctor (bimap, lmap)
 import Data.Function (on)
 import Data.HTTP.Method (Method(GET))
 import Data.Newtype (unwrap)
-import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
+import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
 import Types.CborBytes (cborBytesToByteArray)
 
