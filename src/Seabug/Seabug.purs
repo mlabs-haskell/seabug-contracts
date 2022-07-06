@@ -9,7 +9,11 @@ import Control.Promise (Promise, fromAff)
 import Data.Maybe (Maybe)
 import Effect (Effect)
 import QueryM (callNami)
-import Seabug.CallContract (callMarketPlaceBuy, callMarketPlaceBuyTest, callMarketPlaceListNft)
+import Seabug.CallContract
+  ( callMarketPlaceBuy
+  , callMarketPlaceBuyTest
+  , callMarketPlaceListNft
+  )
 import Serialization.Types (Value)
 import Wallet (Wallet(..), mkNamiWalletAff)
 
