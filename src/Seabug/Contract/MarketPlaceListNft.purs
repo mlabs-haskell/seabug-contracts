@@ -54,10 +54,10 @@ marketPlaceListNft = do
   withMetadata <- liftAff $ (flip parTraverse) scriptUtxos $
     \(input /\ output@(TransactionOutput out)) ->
       runMaybeT $ do
-        datumHash <- MaybeT $ pure $ out.dataHash
-        plutusData <- MaybeT $ pure $ Map.lookup datumHash datums
         MarketplaceDatum { getMarketplaceDatum: curr /\ name } <-
-          MaybeT $ pure $ fromData $ unwrap plutusData
+          MaybeT $ pure $ (fromData <<< unwrap)
+            =<< (_ `Map.lookup` datums)
+            =<< out.dataHash
         guard $ valueOf out.amount curr name == one
         metadata <- MaybeT $ map hush $
           getFullSeabugMetadataWithBackoff (curr /\ name) projectId
