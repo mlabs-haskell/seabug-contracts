@@ -34,7 +34,6 @@ import Data.HTTP.Method (Method(GET))
 import Data.Newtype (unwrap)
 import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
-import Types.CborBytes (cborBytesToByteArray)
 
 import Debug (traceM)
 

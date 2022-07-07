@@ -38,7 +38,6 @@ import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
-import Data.Maybe (fromJust)
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)

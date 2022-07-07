@@ -35,9 +35,7 @@ import Contract.PlutusData
 import Constants.Babbage (utxoEntrySizeWithoutVal)
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
-  ( BalancedSignedTransaction(BalancedSignedTransaction)
-  , TransactionOutput(TransactionOutput)
-  , balanceAndSignTx
+  ( TransactionOutput(TransactionOutput)
   , balanceAndSignTxE
   , submit
   )

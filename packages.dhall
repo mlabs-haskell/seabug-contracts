@@ -327,6 +327,7 @@ let additions =
             , "variant"
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
+          -- should be same rev as in flake.nix
           -- https://github.com/Plutonomicon/cardano-transaction-lib/pull/696
           -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
         , version = "b7614b4e11a57b5b366b65509b86eb4b086bb1ce"

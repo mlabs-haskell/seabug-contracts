@@ -11,9 +11,6 @@ module Seabug.Types
 
 import Contract.Prelude
 
-import Affjax as Affjax
-import Affjax.RequestBody as Affjax.RequestBody
-import Affjax.ResponseFormat as Affjax.ResponseFormat
 import Cardano.Types.Value as Cardano.Types.Value
 import Contract.Value
   ( CurrencySymbol
@@ -22,7 +19,7 @@ import Contract.Value
   , getTokenName
   , mkCurrencySymbol
   )
-import Contract.Monad (Contract(Contract), mkHttpUrl)
+import Contract.Monad (Contract)
 import Contract.Address (PaymentPubKeyHash, PubKeyHash)
 import Contract.Aeson as Aeson
 import Contract.PlutusData
@@ -35,14 +32,11 @@ import Contract.PlutusData
 import Contract.Prim.ByteArray
   ( ByteArray
   , byteArrayFromIntArrayUnsafe
-  , byteArrayToHex
   )
 import Contract.Numeric.Natural (Natural, toBigInt)
 import Contract.Scripts (ValidatorHash)
 import Contract.Time (Slot)
-import Control.Monad.Reader.Trans (asks)
 import Data.Argonaut as Json
-import Data.Argonaut.Encode.Encoders (encodeString)
 import Data.BigInt (BigInt, fromInt, toInt)
 import Hashing (blake2b256Hash)
 import Partial.Unsafe (unsafePartial)
