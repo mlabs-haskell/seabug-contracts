@@ -34,13 +34,8 @@ import Plutus.Types.AssocMap (Map(Map)) as AssocMap
 import ToData (class ToData, toData)
 import Serialization.Hash (ScriptHash, scriptHashFromBytes)
 import Type.Proxy (Proxy(Proxy))
-import Types.ByteArray
-  ( ByteArray
-  , hexToByteArray
-  )
-import Types.RawBytes
-  ( hexToRawBytesUnsafe
-  )
+import Types.ByteArray (ByteArray, hexToByteArray)
+import Types.RawBytes (hexToRawBytesUnsafe)
 import Types.Natural (Natural)
 import Types.PlutusData (PlutusData(Map))
 import Types.PubKeyHash (PubKeyHash)
