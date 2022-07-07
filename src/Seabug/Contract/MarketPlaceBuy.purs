@@ -75,8 +75,6 @@ marketplaceBuy nftData = do
   -- 2) Reindex `Spend` redeemers after finalising transaction inputs.
   -- 3) Attach datums and redeemers to transaction.
   -- 3) Sign tx, returning the Cbor-hex encoded `ByteArray`.
-  log $ "unattachedBalancedTx: " <> show unattachedBalancedTx
-  log $ "curr: " <> show curr <> " newName: " <> show newName
   signedTx <- liftedE
     ( lmap
         ( \e ->
@@ -85,7 +83,6 @@ marketplaceBuy nftData = do
         )
         <$> balanceAndSignTxE unattachedBalancedTx
     )
-  log $ "signedTx: " <> show signedTx
   -- Submit transaction using Cbor-hex encoded `ByteArray`
   transactionHash <- submit signedTx
   log $ "marketplaceBuy: Transaction successfully submitted with hash: "
@@ -108,8 +105,6 @@ mkMarketplaceTx (NftData nftData) = do
   pkh <- liftedM "marketplaceBuy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
   policy' <- liftedE $ pure mintingPolicy
-  log $ "unapplied-policy: " <> show policy'
-
   log $ "policy args: " <> joinWith "; "
     [ "collectionNftCs: " <> show nftCollection.collectionNftCs
     , "lockingScript: " <> show nftCollection.lockingScript
@@ -126,7 +121,6 @@ mkMarketplaceTx (NftData nftData) = do
     , toData nftCollection.daoScript
     , toData nftCollection.daoShare
     ]
-  log $ "policy: " <> show policy
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
     $ liftAff
