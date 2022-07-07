@@ -37,7 +37,8 @@ import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( BalancedSignedTransaction(BalancedSignedTransaction)
   , TransactionOutput(TransactionOutput)
-  , balanceAndSignTx, balanceAndSignTxE
+  , balanceAndSignTx
+  , balanceAndSignTxE
   , submit
   )
 import Contract.TxConstraints
@@ -76,11 +77,14 @@ marketplaceBuy nftData = do
   -- 3) Sign tx, returning the Cbor-hex encoded `ByteArray`.
   log $ "unattachedBalancedTx: " <> show unattachedBalancedTx
   log $ "curr: " <> show curr <> " newName: " <> show newName
-  signedTx <- liftedE (
-    lmap
-      (\e -> "marketplaceBuy: Cannot balance, reindex redeemers, attach datums/redeemers\
-             \ and sign: " <> show e)
-      <$> balanceAndSignTxE unattachedBalancedTx)
+  signedTx <- liftedE
+    ( lmap
+        ( \e ->
+            "marketplaceBuy: Cannot balance, reindex redeemers, attach datums/redeemers\
+            \ and sign: " <> show e
+        )
+        <$> balanceAndSignTxE unattachedBalancedTx
+    )
   log $ "signedTx: " <> show signedTx
   -- Submit transaction using Cbor-hex encoded `ByteArray`
   transactionHash <- submit signedTx
@@ -125,7 +129,8 @@ mkMarketplaceTx (NftData nftData) = do
   log $ "policy: " <> show policy
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
-    $ liftAff $ Value.scriptCurrencySymbol policy
+    $ liftAff
+    $ Value.scriptCurrencySymbol policy
   -- curr <- liftContractM "marketplaceBuy: Cannot get CurrencySymbol"
   --   $ mkCurrencySymbol
   --   $ Value.getCurrencySymbol currSym

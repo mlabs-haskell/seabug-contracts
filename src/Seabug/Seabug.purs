@@ -3,5 +3,9 @@ module Seabug
   , module QueryM.Utxos
   ) where
 
-import Seabug.CallContract (callMarketPlaceBuy, callMarketPlaceBuyTest, callMarketPlaceListNft)
+import Seabug.CallContract
+  ( callMarketPlaceBuy
+  , callMarketPlaceBuyTest
+  , callMarketPlaceListNft
+  )
 import QueryM.Utxos (getWalletBalance)

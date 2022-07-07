@@ -32,7 +32,10 @@
           inherit pkgs src;
           projectName = "seabug-contracts";
           shell = {
-            packages = [ pkgs.fd ];
+            packages = [
+              pkgs.fd
+              pkgs.easy-ps.purs-tidy
+            ];
           };
         };
     in
