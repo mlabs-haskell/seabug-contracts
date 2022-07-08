@@ -10,6 +10,8 @@
       type = "github";
       owner = "Plutonomicon";
       repo = "cardano-transaction-lib";
+      # should be same rev as in packages.dhall
+      # Oh update, do `spago2nix generate`
       ref = "calum/metadata-invalid-char-fix";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
@@ -32,7 +34,10 @@
           inherit pkgs src;
           projectName = "seabug-contracts";
           shell = {
-            packages = [ pkgs.fd ];
+            packages = [
+              pkgs.easy-ps.purs-tidy
+              pkgs.fd
+            ];
           };
         };
     in
