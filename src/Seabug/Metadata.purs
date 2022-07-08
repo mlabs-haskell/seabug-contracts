@@ -37,7 +37,6 @@ import Effect.Aff (delay)
 import Effect.Random (randomRange)
 import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
-import Types.CborBytes (cborBytesToByteArray)
 
 type Hash = String
 
@@ -146,7 +145,7 @@ getMintingTxHash a =
 mkAsset :: CurrencySymbol -> TokenName -> String
 mkAsset currSym tname =
   ((<>) `on` byteArrayToHex) (getCurrencySymbol currSym)
-    (cborBytesToByteArray $ getTokenName tname)
+    (getTokenName tname)
 
 decodeField
   :: forall (a :: Type)

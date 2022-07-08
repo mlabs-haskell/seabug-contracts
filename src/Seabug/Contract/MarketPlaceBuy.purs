@@ -32,12 +32,10 @@ import Contract.PlutusData
   , toData
   , unitRedeemer
   )
-import Contract.ProtocolParameters.Alonzo (minAdaTxOut)
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
-  ( BalancedSignedTransaction(BalancedSignedTransaction)
-  , TransactionOutput(TransactionOutput)
-  , balanceAndSignTx
+  ( TransactionOutput(TransactionOutput)
+  , balanceAndSignTxE
   , submit
   )
 import Contract.TxConstraints
@@ -51,8 +49,10 @@ import Contract.Utxos (utxosAt)
 import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
+import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
+import Data.String.Common (joinWith)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mintingPolicy)
 import Seabug.Token (mkTokenName)
@@ -63,6 +63,9 @@ import Seabug.Types
   , NftId(NftId)
   )
 
+minAdaOnlyUTxOValue :: BigInt
+minAdaOnlyUTxOValue = fromInt 1_000_000
+
 -- TODO docstring
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
 marketplaceBuy nftData = do
@@ -72,12 +75,16 @@ marketplaceBuy nftData = do
   -- 2) Reindex `Spend` redeemers after finalising transaction inputs.
   -- 3) Attach datums and redeemers to transaction.
   -- 3) Sign tx, returning the Cbor-hex encoded `ByteArray`.
-  BalancedSignedTransaction { signedTxCbor } <- liftedM
-    "marketplaceBuy: Cannot balance, reindex redeemers, attach datums/redeemers\
-    \ and sign"
-    (balanceAndSignTx unattachedBalancedTx)
+  signedTx <- liftedE
+    ( lmap
+        ( \e ->
+            "marketplaceBuy: Cannot balance, reindex redeemers, attach datums/redeemers\
+            \ and sign: " <> show e
+        )
+        <$> balanceAndSignTxE unattachedBalancedTx
+    )
   -- Submit transaction using Cbor-hex encoded `ByteArray`
-  transactionHash <- submit signedTxCbor
+  transactionHash <- submit signedTx
   log $ "marketplaceBuy: Transaction successfully submitted with hash: "
     <> show transactionHash
   log $ "marketplaceBuy: Buy successful: " <> show (curr /\ newName)
@@ -98,6 +105,14 @@ mkMarketplaceTx (NftData nftData) = do
   pkh <- liftedM "marketplaceBuy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
   policy' <- liftedE $ pure mintingPolicy
+  log $ "policy args: " <> joinWith "; "
+    [ "collectionNftCs: " <> show nftCollection.collectionNftCs
+    , "lockingScript: " <> show nftCollection.lockingScript
+    , "author: " <> show nftCollection.author
+    , "authorShare: " <> show nftCollection.authorShare
+    , "daoScript: " <> show nftCollection.daoScript
+    , "daoShare: " <> show nftCollection.daoShare
+    ]
   policy <- liftedE $ applyArgs policy'
     [ toData nftCollection.collectionNftCs
     , toData nftCollection.lockingScript
@@ -108,9 +123,8 @@ mkMarketplaceTx (NftData nftData) = do
     ]
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
-    $ pure
-    $ Value.scriptCurrencySymbol
-    $ policy
+    $ liftAff
+    $ Value.scriptCurrencySymbol policy
   -- curr <- liftContractM "marketplaceBuy: Cannot get CurrencySymbol"
   --   $ mkCurrencySymbol
   --   $ Value.getCurrencySymbol currSym
@@ -149,7 +163,7 @@ mkMarketplaceTx (NftData nftData) = do
 
     shareToSubtract :: BigInt -> BigInt
     shareToSubtract v
-      | v < unwrap minAdaTxOut = zero
+      | v < minAdaOnlyUTxOValue = zero
       | otherwise = v
 
     filterLowValue
@@ -157,7 +171,7 @@ mkMarketplaceTx (NftData nftData) = do
       -> (Value.Value -> TxConstraints Unit Unit)
       -> TxConstraints Unit Unit
     filterLowValue v t
-      | v < unwrap minAdaTxOut = mempty
+      | v < minAdaOnlyUTxOValue = mempty
       | otherwise = t (Value.lovelaceValueOf v)
 
     authorShare = getShare $ toBigInt nftCollection.authorShare
@@ -169,11 +183,9 @@ mkMarketplaceTx (NftData nftData) = do
     datum = Datum $ toData $ curr /\ oldName
   userAddr <- liftedM "marketplaceBuy: Cannot get user addr" getWalletAddress
   userUtxos <-
-    liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt
-      (unwrap userAddr).address
+    liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt userAddr
   scriptUtxos <-
-    liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt
-      (unwrap scriptAddr).address
+    liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt scriptAddr
   log $ "scriptUtxos: " <> show scriptUtxos
   utxo /\ utxoIndex <-
     liftContractM "marketplaceBuy: NFT not found on marketplace"
@@ -181,11 +193,12 @@ mkMarketplaceTx (NftData nftData) = do
       $ toUnfoldable
       $ unwrap scriptUtxos
   let
+    utxosForTx = insert utxo utxoIndex $ unwrap userUtxos
     lookup = mconcat
       [ ScriptLookups.mintingPolicy policy
       , ScriptLookups.typedValidatorLookups $ wrap marketplaceValidator'
       , ScriptLookups.validator marketplaceValidator'.validator
-      , ScriptLookups.unspentOutputs $ insert utxo utxoIndex $ unwrap userUtxos
+      , ScriptLookups.unspentOutputs utxosForTx
       , ScriptLookups.ownPaymentPubKeyHash pkh
       ]
 
@@ -210,6 +223,7 @@ mkMarketplaceTx (NftData nftData) = do
               ( newNftValue <> minAdaVal
               )
           ]
+  log $ "utxosTx: " <> show utxosForTx
   -- Created unbalanced tx which stripped datums and redeemers with tx inputs,
   -- the datums and redeemers will be reattached using a server with redeemers
   -- reindexed also.

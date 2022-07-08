@@ -149,7 +149,39 @@ let additions =
           , "untagged-union"
           ]
         , repo = "https://github.com/mlabs-haskell/purescript-aeson.git"
-        , version = "5054e03ee14376768071c24d63889bfab8db2667"
+        , version = "69bd18c4a9cffdebc45c55d2448740721a91854c"
+        }
+      , aeson-helpers =
+        { dependencies =
+          [ "aff"
+          , "argonaut-codecs"
+          , "argonaut-core"
+          , "arrays"
+          , "bifunctors"
+          , "contravariant"
+          , "control"
+          , "effect"
+          , "either"
+          , "enums"
+          , "foldable-traversable"
+          , "foreign-object"
+          , "maybe"
+          , "newtype"
+          , "ordered-collections"
+          , "prelude"
+          , "profunctor"
+          , "psci-support"
+          , "quickcheck"
+          , "record"
+          , "spec"
+          , "spec-quickcheck"
+          , "transformers"
+          , "tuples"
+          , "typelevel-prelude"
+          ]
+        , repo =
+            "https://github.com/mlabs-haskell/purescript-bridge-aeson-helpers.git"
+        , version = "44d0dae060cf78babd4534320192b58c16a6f45b"
         }
       , sequences =
         { dependencies =
@@ -295,7 +327,10 @@ let additions =
             , "variant"
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
-        , version = "a8aabb842ecc1e287d4a60ea4f4c6cff6fbfeea7"
+          -- should be same rev as in flake.nix
+          -- https://github.com/Plutonomicon/cardano-transaction-lib/pull/696
+          -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
+        , version = "b7614b4e11a57b5b366b65509b86eb4b086bb1ce"
         }
       }
-in  upstream // additions
+in upstream // additions

@@ -2,9 +2,10 @@
 Welcome to a Spago project!
 You can edit this file as you like.
 -}
-{ name = "my-project"
+{ name = "seabug-contract"
 , dependencies =
   [ "aeson"
+  , "aeson-helpers"
   , "aff"
   , "aff-promise"
   , "affjax"
@@ -32,6 +33,8 @@ You can edit this file as you like.
   , "prelude"
   , "random"
   , "spec"
+  , "strings"
+  , "text-encoding"
   , "transformers"
   , "tuples"
   , "uint"

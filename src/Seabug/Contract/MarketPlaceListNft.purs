@@ -48,7 +48,7 @@ marketPlaceListNft = do
       $ wrap marketplaceValidator'
   scriptUtxos <- Map.toUnfoldable <<< unwrap <$>
     liftedM "marketPlaceListNft: Cannot get script Utxos"
-      (utxosAt (unwrap scriptAddr).address)
+      (utxosAt scriptAddr)
   datums <- getDatumsByHashes
     $ mapMaybe (snd >>> unwrap >>> _.dataHash) scriptUtxos
   withMetadata <- liftAff $ (flip parTraverse) scriptUtxos $
