@@ -32,7 +32,6 @@ import Contract.PlutusData
   , toData
   , unitRedeemer
   )
-import Constants.Babbage (utxoEntrySizeWithoutVal)
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( TransactionOutput(TransactionOutput)
@@ -63,6 +62,9 @@ import Seabug.Types
   , NftData(NftData)
   , NftId(NftId)
   )
+
+minAdaOnlyUTxOValue :: BigInt
+minAdaOnlyUTxOValue = fromInt 1_000_000
 
 -- TODO docstring
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
@@ -161,7 +163,7 @@ mkMarketplaceTx (NftData nftData) = do
 
     shareToSubtract :: BigInt -> BigInt
     shareToSubtract v
-      | v < utxoEntrySizeWithoutVal = zero
+      | v < minAdaOnlyUTxOValue = zero
       | otherwise = v
 
     filterLowValue
@@ -169,7 +171,7 @@ mkMarketplaceTx (NftData nftData) = do
       -> (Value.Value -> TxConstraints Unit Unit)
       -> TxConstraints Unit Unit
     filterLowValue v t
-      | v < utxoEntrySizeWithoutVal = mempty
+      | v < minAdaOnlyUTxOValue = mempty
       | otherwise = t (Value.lovelaceValueOf v)
 
     authorShare = getShare $ toBigInt nftCollection.authorShare
