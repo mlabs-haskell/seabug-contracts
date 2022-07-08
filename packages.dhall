@@ -330,7 +330,9 @@ let additions =
           -- should be same rev as in flake.nix
           -- https://github.com/Plutonomicon/cardano-transaction-lib/pull/696
           -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
-        , version = "d1a9d61806e79adb73dcecb591e1bdd310cf4d69"
+          -- Commit is from our branch calum/metadata-invalid-char-fix which is based off this PR and
+          -- includes a small fix to get the build working.
+        , version = "8ff7b75d2048a9ea9d625f97d27176f59b09fb6a"
         }
       }
 in upstream // additions
