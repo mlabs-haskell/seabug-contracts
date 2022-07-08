@@ -46,8 +46,8 @@ import Data.BigInt (BigInt, fromInt)
 import Data.BigInt as BigInt
 import Data.Map (insert, toUnfoldable)
 import Data.String.Common (joinWith)
-import Metadata.Seabug (SeabugMetadata(..))
-import Metadata.Seabug.Share (mkShare)
+import Seabug.Metadata.Types (SeabugMetadata(..))
+import Seabug.Metadata.Share (mkShare)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mintingPolicy)
 import Seabug.Token (mkTokenName)
@@ -240,17 +240,12 @@ setSeabugMetadata (NftData nftData) tx = do
     natToShare nat = liftContractM "Invalid share"
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
+    policyId = Value.currencyMPSHash nftCollection.collectionNftCs
   collectionNftCS <- liftContractM "Could not convert between currency symbols"
     $ Cardano.Types.Value.mkCurrencySymbol
     $ Value.getCurrencySymbol nftCollection.collectionNftCs
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
-  policyId <-
-    -- Note: I don't think this should fail, newer versions of CTL
-    -- guarantee it won't fail
-    liftContractM
-      "Could not convert collection NFT currency symbol to script hash"
-      $ Value.currencyMPSHash nftCollection.collectionNftCs
   setTxMetadata tx $ SeabugMetadata
     { policyId
     , mintPolicy: mempty
