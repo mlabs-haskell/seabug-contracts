@@ -5,7 +5,6 @@ module Seabug.Contract.MarketPlaceBuy
 
 import Contract.Prelude
 
-import Cardano.Types.Value as Cardano.Types.Value
 import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
 import Contract.AuxiliaryData (setTxMetadata)
 import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
@@ -241,15 +240,12 @@ setSeabugMetadata (NftData nftData) tx = do
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
     policyId = Value.currencyMPSHash nftCollection.collectionNftCs
-  collectionNftCS <- liftContractM "Could not convert between currency symbols"
-    $ Cardano.Types.Value.mkCurrencySymbol
-    $ Value.getCurrencySymbol nftCollection.collectionNftCs
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
   setTxMetadata tx $ SeabugMetadata
     { policyId
     , mintPolicy: mempty
-    , collectionNftCS
+    , collectionNftCS: nftCollection.collectionNftCs
     , lockingScript: nftCollection.lockingScript
     , collectionNftTN: nftId.collectionNftTn
     , authorPkh: unwrap nftCollection.author

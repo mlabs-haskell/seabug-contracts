@@ -40,7 +40,7 @@ import Types.Natural (Natural)
 import Types.PlutusData (PlutusData(Map))
 import Types.PubKeyHash (PubKeyHash)
 import Types.Scripts (MintingPolicyHash, ValidatorHash)
-import Cardano.Types.Value (CurrencySymbol, mkCurrencySymbol)
+import Contract.Value (CurrencySymbol, mkCurrencySymbol)
 import Types.TokenName (TokenName, mkTokenName)
 import Types.TransactionMetadata (TransactionMetadatum(MetadataMap))
 

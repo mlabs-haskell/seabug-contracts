@@ -21,14 +21,13 @@ import Contract.Numeric.Natural as Natural
 import Contract.Prelude (fromJust)
 import Contract.Prim.ByteArray (hexToByteArrayUnsafe)
 import Contract.Scripts (MintingPolicyHash(..), ScriptHash, ValidatorHash(..))
-import Contract.Value (TokenName, mkTokenName)
+import Contract.Value (CurrencySymbol, mkCurrencySymbol, TokenName, mkTokenName)
 import Data.BigInt as BigInt
-import Seabug.Metadata.Types (SeabugMetadata(..), SeabugMetadataDelta(..))
-import Seabug.Metadata.Share (Share, mkShare)
 import Partial.Unsafe (unsafePartial)
+import Seabug.Metadata.Share (Share, mkShare)
+import Seabug.Metadata.Types (SeabugMetadata(..), SeabugMetadataDelta(..))
 import Serialization.Hash (ed25519KeyHashFromBytes, scriptHashFromBytes)
 import Types.RawBytes (hexToRawBytesUnsafe)
-import Cardano.Types.Value (CurrencySymbol, mkCurrencySymbol)
 
 currencySymbol1 :: CurrencySymbol
 currencySymbol1 = unsafePartial $ fromJust $ mkCurrencySymbol $

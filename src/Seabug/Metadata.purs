@@ -10,7 +10,6 @@ import Aeson as Aeson
 import Affjax as Affjax
 import Affjax.RequestHeader as Affjax.RequestHeader
 import Affjax.ResponseFormat as Affjax.ResponseFormat
-import Cardano.Types.Value as Cardano.Types.Value
 import Contract.Monad (Contract)
 import Contract.Prim.ByteArray (byteArrayToHex)
 import Contract.Transaction
@@ -21,7 +20,6 @@ import Contract.Value
   , TokenName
   , getCurrencySymbol
   , getTokenName
-  , mkCurrencySymbol
   )
 import Control.Alternative (guard)
 import Control.Monad.Except.Trans (ExceptT(ExceptT), except, runExceptT)
@@ -33,7 +31,6 @@ import Data.Function (on)
 import Data.HTTP.Method (Method(GET))
 import Data.Newtype (unwrap)
 import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
-import Partial.Unsafe (unsafePartial)
 
 import Debug (traceM)
 
@@ -60,11 +57,7 @@ getIpfsHash
   -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
 getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
   except <<< (decodeField "image" <=< decodeFieldJson "onchain_metadata")
-    =<< mkGetRequest ("assets/" <> mkAsset curr collectionNftTN)
-  where
-  curr :: CurrencySymbol
-  curr = unsafePartial $ fromJust $ mkCurrencySymbol $
-    Cardano.Types.Value.getCurrencySymbol collectionNftCS
+    =<< mkGetRequest ("assets/" <> mkAsset collectionNftCS collectionNftTN)
 
 getMintingTxSeabugMetadata
   :: forall (r :: Row Type)
