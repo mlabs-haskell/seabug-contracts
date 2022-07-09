@@ -1,7 +1,8 @@
 module Seabug.CallContract
   ( callMarketPlaceBuy
-  , callMarketPlaceListNft
   , callMarketPlaceBuyTest
+  , callMarketPlaceFetchNft
+  , callMarketPlaceListNft
   ) where
 
 import Contract.Prelude
@@ -16,12 +17,9 @@ import Contract.Monad
   , runContract_
   )
 import Contract.Numeric.Natural (toBigInt)
-import Contract.Prim.ByteArray
-  ( byteArrayToHex
-  , hexToByteArray
-  )
+import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
 import Contract.Transaction
-  ( TransactionInput(TransactionInput)
+  ( TransactionInput(..)
   , TransactionOutput(TransactionOutput)
   )
 import Contract.Value
@@ -38,19 +36,21 @@ import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
+import Data.Log.Level (LogLevel(..))
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
 import Effect.Aff (error)
 import Effect.Class (liftEffect)
-import Data.Log.Level (LogLevel(..))
 import Effect.Exception (Error)
-import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
-import Seabug.Metadata.Share (unShare)
 import Partial.Unsafe (unsafePartial)
 import Plutus.Conversion (fromPlutusAddress)
+import Seabug.Contract.Common (NftResult)
 import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
-import Seabug.Contract.MarketPlaceListNft (ListNftResult, marketPlaceListNft)
+import Seabug.Contract.MarketPlaceFetchNft (marketPlaceFetchNft)
+import Seabug.Contract.MarketPlaceListNft (marketPlaceListNft)
+import Seabug.Metadata.Share (unShare)
+import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Seabug.Types
   ( NftCollection(NftCollection)
   , NftData(NftData)
@@ -63,13 +63,20 @@ import Serialization.Hash
   , scriptHashFromBech32
   , scriptHashToBech32Unsafe
   )
+import Types.BigNum as BigNum
 import Types.Natural as Nat
 import Wallet (mkNamiWalletAff)
-import Types.BigNum as BigNum
 
 -- | Exists temporarily for testing purposes
 callMarketPlaceBuyTest :: String -> Effect (Promise String)
 callMarketPlaceBuyTest = Promise.fromAff <<< pure
+
+callMarketPlaceFetchNft
+  :: ContractConfiguration -> TransactionInputOut -> Effect (Promise Unit)
+callMarketPlaceFetchNft cfg args = Promise.fromAff do
+  contractConfig <- buildContractConfig cfg
+  txInput <- liftEffect $ liftEither $ buildTransactionInput args
+  runContract_ contractConfig (marketPlaceFetchNft txInput)
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 --   Returns a JS promise holding no data.
@@ -123,12 +130,14 @@ type BuyNftArgs =
       }
   }
 
+type TransactionInputOut = { transactionId :: String, inputIndex :: Int }
+
 -- Placeholder for types I'm not sure how should we represent on frontend.
 type ValueOut = Array
   { currencySymbol :: String, tokenName :: String, amount :: BigInt }
 
 type ListNftResultOut =
-  { input :: { transactionId :: String, inputIndex :: Int }
+  { input :: TransactionInputOut
   , output :: { address :: String, value :: ValueOut, dataHash :: String }
   , metadata ::
       { seabugMetadata ::
@@ -193,7 +202,7 @@ stringToLogLevel "Warn" = Just Warn
 stringToLogLevel "Error" = Just Error
 stringToLogLevel _ = Nothing
 
-buildNftList :: NetworkId -> ListNftResult -> ListNftResultOut
+buildNftList :: NetworkId -> NftResult -> ListNftResultOut
 buildNftList
   network
   { input: TransactionInput input, output: TransactionOutput output, metadata } =
@@ -298,3 +307,13 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
       , daoScript
       , daoShare
       }
+
+buildTransactionInput :: TransactionInputOut -> Either Error TransactionInput
+buildTransactionInput input = do
+  transactionId <-
+    note (error $ "Invalid transaction id: " <> input.transactionId)
+      $ wrap
+      <$> hexToByteArray input.transactionId
+  index <- note (error $ "Invalid input index: " <> show input.inputIndex) $
+    UInt.fromInt' input.inputIndex
+  pure $ wrap { transactionId, index }

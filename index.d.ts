@@ -2,6 +2,8 @@ export function callMarketPlaceBuy(config: Config, args: BuyNftArgs):
     Promise<void>
 export function callMarketPlaceListNft(config: Config):
     Promise<Array<NftListing>>
+export function callMarketPlaceFetchNft(config: Config, args: FetchNftArgs):
+    Promise<NftListing>
 export function connectWallet(): Promise<any>
 export function getWalletBalance(): Promise<any>
 
@@ -35,6 +37,8 @@ export type ContractArgs = {
 export type BuyNftArgs = {
 
 }
+
+export type FetchNftArgs = Input
 
 export type NftCollectionArgs = {
     // CurrencySymbol of nft collection

@@ -7,5 +7,6 @@ import Seabug.CallContract
   ( callMarketPlaceBuy
   , callMarketPlaceBuyTest
   , callMarketPlaceListNft
+  , callMarketPlaceFetchNft
   )
 import QueryM.Utxos (getWalletBalance)
