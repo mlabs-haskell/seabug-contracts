@@ -1,21 +1,20 @@
 module Seabug.Metadata
-  ( FullSeabugMetadata
+  ( BlockfrostFetchError(..)
+  , FullSeabugMetadata
   , Hash
   , getFullSeabugMetadata
+  , getFullSeabugMetadataWithBackoff
   ) where
 
 import Contract.Prelude
 
 import Aeson as Aeson
+import Affjax (printError)
 import Affjax as Affjax
 import Affjax.RequestHeader as Affjax.RequestHeader
 import Affjax.ResponseFormat as Affjax.ResponseFormat
 import Cardano.Types.Value as Cardano.Types.Value
-import Contract.Monad (Contract)
 import Contract.Prim.ByteArray (byteArrayToHex)
-import Contract.Transaction
-  ( ClientError(ClientHttpError, ClientDecodeJsonError)
-  )
 import Contract.Value
   ( CurrencySymbol
   , TokenName
@@ -24,18 +23,20 @@ import Contract.Value
   , mkCurrencySymbol
   )
 import Control.Alternative (guard)
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except.Trans (ExceptT(ExceptT), except, runExceptT)
+import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Monad.Reader.Trans (asks)
 import Control.Monad.Trans.Class (lift)
 import Data.Argonaut as Argonaut
-import Data.Bifunctor (bimap, lmap)
+import Data.Bifunctor (lmap)
 import Data.Function (on)
 import Data.HTTP.Method (Method(GET))
 import Data.Newtype (unwrap)
+import Effect.Aff (delay)
+import Effect.Random (randomRange)
 import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Partial.Unsafe (unsafePartial)
-
-import Debug (traceM)
 
 type Hash = String
 
@@ -44,22 +45,61 @@ type FullSeabugMetadata =
   , ipfsHash :: Hash
   }
 
+data BlockfrostFetchError
+  = BlockfrostRateLimit
+  | BlockfrostOtherError String
+
+derive instance Generic BlockfrostFetchError _
+
+instance Show BlockfrostFetchError where
+  show = genericShow
+
+type BlockfrostFetch a = ExceptT BlockfrostFetchError
+  (ReaderT { projectId :: String } Aff)
+  a
+
+-- | Tries to get the metadata for the given asset using
+-- | Blockfrost. If the rate limit is hit, retries after a random
+-- | delay, up to 5 times. Uses a very simple back-off mechanism.
+-- | Instead of relying on this, refactor so the rate limit isn't hit.
+getFullSeabugMetadataWithBackoff
+  :: CurrencySymbol /\ TokenName
+  -> String
+  -> Aff (Either BlockfrostFetchError FullSeabugMetadata)
+getFullSeabugMetadataWithBackoff asset projectId = go 1.0
+  where
+  go n = do
+    r <- getFullSeabugMetadata asset projectId
+    case r of
+      Left BlockfrostRateLimit
+        | n < 5.0 -> do
+            let n' = n + 1.0
+            log "Blockfrost rate limit hit, backing off"
+            -- Wait a random amount of time in the range of [1, 3 *
+            -- (attempt + 1)) seconds, this is just a heuristic based
+            -- on my testing
+            delay <<< wrap <<< (_ * 1000.0) =<<
+              (liftEffect $ randomRange 1.0 (3.0 * n'))
+            log $ "Retrying, attempt " <> show n'
+            go n'
+      _ -> pure r
+
 getFullSeabugMetadata
-  :: forall (r :: Row Type)
-   . CurrencySymbol /\ TokenName
-  -> Contract (projectId :: String | r) (Either ClientError FullSeabugMetadata)
-getFullSeabugMetadata a@(currSym /\ _) = runExceptT $ do
-  seabugMetadata <- getMintingTxSeabugMetadata currSym =<< getMintingTxHash a
-  log $ show seabugMetadata
-  ipfsHash <- getIpfsHash seabugMetadata
-  pure { seabugMetadata, ipfsHash }
+  :: CurrencySymbol /\ TokenName
+  -> String
+  -> Aff (Either BlockfrostFetchError FullSeabugMetadata)
+getFullSeabugMetadata a@(currSym /\ _) projectId =
+  flip runReaderT { projectId } <<< runExceptT $ do
+    seabugMetadata <-
+      getMintingTxSeabugMetadata currSym =<< getMintingTxHash a
+    ipfsHash <- getIpfsHash seabugMetadata
+    pure { seabugMetadata, ipfsHash }
 
 getIpfsHash
-  :: forall (r :: Row Type)
-   . SeabugMetadata
-  -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
+  :: SeabugMetadata
+  -> BlockfrostFetch Hash
 getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
-  except <<< (decodeField "image" <=< decodeFieldJson "onchain_metadata")
+  except <<< (decodeField "image" <=< decodeField "onchain_metadata")
     =<< mkGetRequest ("assets/" <> mkAsset curr collectionNftTN)
   where
   curr :: CurrencySymbol
@@ -70,17 +110,17 @@ getMintingTxSeabugMetadata
   :: forall (r :: Row Type)
    . CurrencySymbol
   -> Hash
-  -> ExceptT ClientError (Contract (projectId :: String | r)) SeabugMetadata
+  -> BlockfrostFetch SeabugMetadata
 getMintingTxSeabugMetadata currSym txHash = do
   res <- mkGetRequest $ "txs/" <> txHash <> "/metadata"
   ms <- except
-    $ lmap ClientDecodeJsonError
+    $ lmap (BlockfrostOtherError <<< show)
     $ Aeson.caseAesonArray
         (Left (Argonaut.TypeMismatch "Expected array of objects"))
         Right
-        (Aeson.jsonToAeson res)
+        res
   except
-    $ note (ClientDecodeJsonError (Argonaut.UnexpectedValue res))
+    $ note (BlockfrostOtherError ("Unexpected JSON: " <> show res))
     $ findSeabugMetadata ms
   where
   findSeabugMetadata :: Array Aeson.Aeson -> Maybe SeabugMetadata
@@ -97,9 +137,9 @@ getMintingTxSeabugMetadata currSym txHash = do
 getMintingTxHash
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName
-  -> ExceptT ClientError (Contract (projectId :: String | r)) Hash
+  -> BlockfrostFetch Hash
 getMintingTxHash a =
-  except <<< decodeFieldJson "initial_mint_tx_hash"
+  except <<< decodeField "initial_mint_tx_hash"
     =<< mkGetRequest ("assets/" <> uncurry mkAsset a)
 
 mkAsset :: CurrencySymbol -> TokenName -> String
@@ -112,41 +152,41 @@ decodeField
    . Aeson.DecodeAeson a
   => String
   -> Aeson.Aeson
-  -> Either ClientError a
+  -> Either BlockfrostFetchError a
 decodeField field = do
-  traceM $ show field
-  lmap ClientDecodeJsonError <<<
+  lmap (BlockfrostOtherError <<< show) <<<
     ( Aeson.decodeAeson
         <=< Aeson.caseAesonObject
           (Left (Argonaut.TypeMismatch "Expected Object"))
           (flip Aeson.getField field)
     )
 
-decodeFieldJson
-  :: forall (a :: Type)
-   . Aeson.DecodeAeson a
-  => String
-  -> Argonaut.Json
-  -> Either ClientError a
-decodeFieldJson field = decodeField field <<< Aeson.jsonToAeson
-
 mkGetRequest
   :: forall (r :: Row Type)
    . String
-  -> ExceptT ClientError (Contract (projectId :: String | r)) Argonaut.Json
+  -> BlockfrostFetch Aeson.Aeson
 mkGetRequest path = do
-  projectId <- lift $ asks $ _.projectId <<< unwrap
+  projectId <- lift $ asks $ _.projectId
   let
-    req :: Affjax.Request Argonaut.Json
+    req :: Affjax.Request String
     req = Affjax.defaultRequest
       { url = mkUrl
-      , responseFormat = Affjax.ResponseFormat.json
+      , responseFormat = Affjax.ResponseFormat.string
       , method = Left GET
       , headers =
           [ Affjax.RequestHeader.RequestHeader "project_id" projectId
           ]
       }
-  ExceptT $ liftAff $ Affjax.request req <#> bimap ClientHttpError _.body
+  res <- ExceptT $ liftAff $ do
+    r <- Affjax.request req <#> lmap (BlockfrostOtherError <<< printError)
+    case r of
+      Left e -> log $ show e
+      Right _ -> pure unit
+    pure r
+  when (unwrap res.status == 429) $ throwError $ BlockfrostRateLimit
+  except $
+    lmap (BlockfrostOtherError <<< (("Error parsing JSON: " <> _) <<< show))
+      (Aeson.parseJsonStringToAeson res.body)
   where
   mkUrl :: String
   mkUrl = "https://cardano-testnet.blockfrost.io/api/v0/" <> path
