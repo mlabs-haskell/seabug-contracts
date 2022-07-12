@@ -53,7 +53,6 @@ newtype MintParams = MintParams
     price :: Natural
   , lockLockup :: BigInt
   , lockLockupEnd :: Slot
-  , fakeAuthor :: Maybe PaymentPubKeyHash
   , feeVaultKeys :: Array PubKeyHash -- `List` is also an option
   }
 
@@ -65,14 +64,13 @@ instance Show MintParams where
   show = genericShow
 
 instance FromData MintParams where
-  fromData (Constr n [ as, ds, pr, ll, lle, fa, fvk ]) | n == zero =
+  fromData (Constr n [ as, ds, pr, ll, lle, fvk ]) | n == zero =
     MintParams <$>
       ( { authorShare: _
         , daoShare: _
         , price: _
         , lockLockup: _
         , lockLockupEnd: _
-        , fakeAuthor: _
         , feeVaultKeys: _
         }
           <$> fromData as
@@ -80,7 +78,6 @@ instance FromData MintParams where
           <*> fromData pr
           <*> fromData ll
           <*> fromData lle
-          <*> fromData fa
           <*> fromData fvk
       )
   fromData _ = Nothing
@@ -93,7 +90,6 @@ instance ToData MintParams where
         , price
         , lockLockup
         , lockLockupEnd
-        , fakeAuthor
         , feeVaultKeys
         }
     ) =
@@ -103,7 +99,6 @@ instance ToData MintParams where
       , toData price
       , toData lockLockup
       , toData lockLockupEnd
-      , toData fakeAuthor
       , toData feeVaultKeys
       ]
 
