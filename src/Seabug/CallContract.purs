@@ -6,7 +6,6 @@ module Seabug.CallContract
 
 import Contract.Prelude
 
-import Cardano.Types.Value as Cardano.Types.Value
 import Contract.Address (Slot(Slot))
 import Contract.Monad
   ( ConfigParams(ConfigParams)
@@ -16,10 +15,7 @@ import Contract.Monad
   , runContract_
   )
 import Contract.Numeric.Natural (toBigInt)
-import Contract.Prim.ByteArray
-  ( byteArrayToHex
-  , hexToByteArray
-  )
+import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
 import Contract.Transaction
   ( TransactionInput(TransactionInput)
   , TransactionOutput(TransactionOutput)
@@ -38,19 +34,19 @@ import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
+import Data.Log.Level (LogLevel(..))
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
 import Effect.Aff (error)
 import Effect.Class (liftEffect)
-import Data.Log.Level (LogLevel(..))
 import Effect.Exception (Error)
-import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
-import Seabug.Metadata.Share (unShare)
 import Partial.Unsafe (unsafePartial)
 import Plutus.Conversion (fromPlutusAddress)
 import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
 import Seabug.Contract.MarketPlaceListNft (ListNftResult, marketPlaceListNft)
+import Seabug.Metadata.Share (unShare)
+import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Seabug.Types
   ( NftCollection(NftCollection)
   , NftData(NftData)
@@ -63,9 +59,9 @@ import Serialization.Hash
   , scriptHashFromBech32
   , scriptHashToBech32Unsafe
   )
+import Types.BigNum as BigNum
 import Types.Natural as Nat
 import Wallet (mkNamiWalletAff)
-import Types.BigNum as BigNum
 
 -- | Exists temporarily for testing purposes
 callMarketPlaceBuyTest :: String -> Effect (Promise String)
@@ -228,8 +224,7 @@ buildNftList
   convertSeabugMetaData (SeabugMetadata m) =
     { policyId: scriptHashToBech32Unsafe "policy_vkh" $ unwrap m.policyId -- or the prefix should just be 'script'
     , mintPolicy: byteArrayToHex m.mintPolicy
-    , collectionNftCS: byteArrayToHex $ Cardano.Types.Value.getCurrencySymbol $
-        m.collectionNftCS
+    , collectionNftCS: byteArrayToHex $ getCurrencySymbol m.collectionNftCS
     , collectionNftTN: byteArrayToHex $ getTokenName m.collectionNftTN
     , lockingScript: scriptHashToBech32Unsafe "script" $ unwrap m.lockingScript
     , authorPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap

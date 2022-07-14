@@ -11,8 +11,8 @@
       owner = "Plutonomicon";
       repo = "cardano-transaction-lib";
       # should be same rev as in packages.dhall
-      # Oh update, do `spago2nix generate`
-      rev = "b7614b4e11a57b5b366b65509b86eb4b086bb1ce";
+      # To update, do `spago2nix generate`
+      ref = "calum/metadata-invalid-char-fix";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };

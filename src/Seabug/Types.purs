@@ -12,13 +12,11 @@ module Seabug.Types
 
 import Contract.Prelude
 
-import Cardano.Types.Value as Cardano.Types.Value
 import Contract.Value
   ( CurrencySymbol
   , TokenName
   , getCurrencySymbol
   , getTokenName
-  , mkCurrencySymbol
   )
 import Contract.Monad (Contract)
 import Contract.Address (PaymentPubKeyHash, PubKeyHash)
@@ -157,12 +155,7 @@ instance Aeson.DecodeAeson NftCollection where
       (Left $ Json.TypeMismatch "Expected Json Object")
       ( \o ->
           do
-            collectionNftCs <- do
-              nftCs <- Aeson.getField o "nftCollection'collectionNftCs"
-              note (Json.TypeMismatch "expected currency symbol")
-                $ mkCurrencySymbol
-                $ Cardano.Types.Value.getCurrencySymbol nftCs
-
+            collectionNftCs <- Aeson.getField o "nftCollection'collectionNftCs"
             lockLockupEnd <- Aeson.getField o "nftCollection'lockLockupEnd"
             lockingScript <- Aeson.getField o "nftCollection'lockingScript"
             author <- Aeson.getField o "nftCollection'author"

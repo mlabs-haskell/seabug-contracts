@@ -5,11 +5,16 @@ module Seabug.Contract.MarketPlaceBuy
 
 import Contract.Prelude
 
-import Contract.Address
-  ( getNetworkId
-  , ownPaymentPubKeyHash
+import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
+import Contract.AuxiliaryData (setTxMetadata)
+import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
+import Contract.Numeric.Natural (toBigInt)
+import Contract.PlutusData
+  ( Datum(Datum)
+  , Redeemer(Redeemer)
+  , toData
+  , unitRedeemer
   )
-
 import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
 import Contract.ScriptLookups
   ( mintingPolicy
@@ -18,20 +23,6 @@ import Contract.ScriptLookups
   , typedValidatorLookups
   , unspentOutputs
   ) as ScriptLookups
-import Contract.Monad
-  ( Contract
-  , liftContractM
-  , liftContractE
-  , liftedE
-  , liftedM
-  )
-import Contract.Numeric.Natural (toBigInt)
-import Contract.PlutusData
-  ( Datum(Datum)
-  , Redeemer(Redeemer)
-  , toData
-  , unitRedeemer
-  )
 import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( TransactionOutput(TransactionOutput)
@@ -51,15 +42,18 @@ import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
 import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
+import Data.BigInt as BigInt
 import Data.Map (insert, toUnfoldable)
 import Data.String.Common (joinWith)
+import Seabug.Metadata.Types (SeabugMetadata(..))
+import Seabug.Metadata.Share (mkShare)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mintingPolicy)
 import Seabug.Token (mkTokenName)
 import Seabug.Types
   ( MarketplaceDatum(MarketplaceDatum)
   , MintAct(ChangeOwner)
-  , NftData(NftData)
+  , NftData(..)
   , NftId(NftId)
   )
 
@@ -228,4 +222,36 @@ mkMarketplaceTx (NftData nftData) = do
   -- the datums and redeemers will be reattached using a server with redeemers
   -- reindexed also.
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookup constraints
-  pure $ txDatumsRedeemerTxIns /\ curr /\ newName
+  txWithMetadata <-
+    setSeabugMetadata (wrap nftData { nftId = newNft }) txDatumsRedeemerTxIns
+  pure $ txWithMetadata /\ curr /\ newName
+
+-- | Set metadata on the transaction for the given NFT
+setSeabugMetadata
+  :: forall (r :: Row Type)
+   . NftData
+  -> UnattachedUnbalancedTx
+  -> Contract r UnattachedUnbalancedTx
+setSeabugMetadata (NftData nftData) tx = do
+  let
+    nftCollection = unwrap nftData.nftCollection
+    nftId = unwrap nftData.nftId
+    natToShare nat = liftContractM "Invalid share"
+      $ mkShare
+      =<< BigInt.toInt (toBigInt nat)
+    policyId = Value.currencyMPSHash nftCollection.collectionNftCs
+  authorShareValidated <- natToShare nftCollection.authorShare
+  marketplaceShareValidated <- natToShare nftCollection.daoShare
+  setTxMetadata tx $ SeabugMetadata
+    { policyId
+    , mintPolicy: mempty
+    , collectionNftCS: nftCollection.collectionNftCs
+    , lockingScript: nftCollection.lockingScript
+    , collectionNftTN: nftId.collectionNftTn
+    , authorPkh: unwrap nftCollection.author
+    , authorShare: authorShareValidated
+    , marketplaceScript: nftCollection.daoScript
+    , marketplaceShare: marketplaceShareValidated
+    , ownerPkh: unwrap nftId.owner
+    , ownerPrice: nftId.price
+    }
