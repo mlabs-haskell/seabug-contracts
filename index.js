@@ -35,3 +35,5 @@ exports.getWalletBalance = async () => {
   const sb = await seabug;
   return sb.getWalletBalance();
 };
+
+seabug.then((sb) => sb.main())
