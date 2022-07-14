@@ -23,6 +23,7 @@ import Contract.Value
   , scriptCurrencySymbol
   , singleton
   )
+import Seabug.Contract.MarketPlaceBuy (setSeabugMetadata)
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.Token as Token
@@ -32,6 +33,7 @@ import Seabug.Types
   , MintAct(..)
   , MintParams(..)
   , NftCollection(..)
+  , NftData(..)
   , NftId(..)
   )
 import Types.BigNum as BigNum
@@ -49,7 +51,7 @@ mintWithCollection
 mintWithCollection
   (collectionNftCs /\ collectionNftTn)
   ( MintParams
-      { price, lockLockup, lockLockupEnd, authorShare, daoShare, feeVaultKeys }
+      { price, lockLockup, lockLockupEnd, authorShare, daoShare }
   ) = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
   addr <- liftContractM "Cannot get user address" $
@@ -89,6 +91,7 @@ mintWithCollection
     nftValue = singleton curr tn one
     lookups = mconcat
       [ Lookups.mintingPolicy policy, Lookups.unspentOutputs (unwrap utxos) ]
+
     constraints :: Constraints.TxConstraints Unit Unit
     constraints = mconcat
       [ Constraints.mustMintValueWithRedeemer (wrap $ toData $ MintToken nft)
@@ -107,8 +110,11 @@ mintWithCollection
           ) $ singleton collectionNftCs collectionNftTn one
       , Constraints.mustValidateIn $ from now
       ]
-  unBalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
-  signedTx <- liftedE $ balanceAndSignTxE unBalancedTx
+  unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
+  unbalancedTxWithMetadata <- setSeabugMetadata
+    (NftData { nftId: nft, nftCollection: collection })
+    unbalancedTx
+  signedTx <- liftedE $ balanceAndSignTxE unbalancedTxWithMetadata
   transactionHash <- submit signedTx
   log $ "Mint transaction successfully submitted with hash: " <> show
     transactionHash

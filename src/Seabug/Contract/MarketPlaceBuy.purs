@@ -1,6 +1,8 @@
 module Seabug.Contract.MarketPlaceBuy
   ( marketplaceBuy
   , mkMarketplaceTx
+  -- TODO: move this function
+  , setSeabugMetadata
   ) where
 
 import Contract.Prelude
