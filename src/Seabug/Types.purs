@@ -1,5 +1,6 @@
 module Seabug.Types
   ( MarketplaceDatum(..)
+  , LockDatum(..)
   , MintAct(..)
   , MintParams(..)
   , NftCollection(..)
