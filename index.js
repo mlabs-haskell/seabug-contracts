@@ -36,4 +36,4 @@ exports.getWalletBalance = async () => {
   return sb.getWalletBalance();
 };
 
-seabug.then((sb) => sb.main())
+// seabug.then((sb) => sb.main().then(() => console.log("Done")))

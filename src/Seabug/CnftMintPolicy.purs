@@ -1,15 +1,22 @@
-module Seabug.CNFTMintPolicy
+module Seabug.CnftMintPolicy
   ( mkCnftMintingPolicy
   , main
   ) where
 
 import Contract.Prelude
 
-import Contract.Monad (Contract, defaultTestnetContractConfig, launchAff_, liftContractE, liftedE, runContract_)
+import Contract.Monad
+  ( Contract
+  , defaultTestnetContractConfig
+  , launchAff_
+  , liftContractE
+  , liftedE
+  , runContract_
+  )
 import Contract.PlutusData (toData)
 import Contract.Prim.ByteArray (hexToByteArrayUnsafe)
 import Contract.Scripts (MintingPolicy, applyArgs)
-import Contract.Transaction (TransactionInput(..))
+import Contract.Transaction (TransactionInput)
 import Contract.Value (scriptCurrencySymbol)
 import Data.Argonaut (Json, JsonDecodeError)
 import Data.UInt (fromInt)
@@ -20,9 +27,9 @@ mkCnftMintingPolicy
   :: forall (r :: Row Type)
    . TransactionInput
   -> Contract r (Either QueryM.ClientError MintingPolicy)
-mkCnftMintingPolicy (TransactionInput {transactionId, index}) = do
+mkCnftMintingPolicy oref = do
   p <- liftContractE cnftMintingPolicy
-  applyArgs p [ toData transactionId, toData index ]
+  applyArgs p [ toData oref ]
 
 main :: Effect Unit
 main = launchAff_ $ do

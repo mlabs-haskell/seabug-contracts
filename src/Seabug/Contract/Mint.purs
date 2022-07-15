@@ -114,6 +114,7 @@ mintWithCollection
   unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
   unbalancedTxWithMetadata <- setSeabugMetadata
     (NftData { nftId: nft, nftCollection: collection })
+    curr
     unbalancedTx
   signedTx <- liftedE $ balanceAndSignTxE unbalancedTxWithMetadata
   transactionHash <- submit signedTx

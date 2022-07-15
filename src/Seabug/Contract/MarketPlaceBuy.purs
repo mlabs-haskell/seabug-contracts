@@ -39,6 +39,7 @@ import Contract.TxConstraints
   , mustSpendScriptOutput
   )
 import Contract.Utxos (utxosAt)
+import Contract.Value (CurrencySymbol)
 import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
@@ -225,23 +226,25 @@ mkMarketplaceTx (NftData nftData) = do
   -- reindexed also.
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookup constraints
   txWithMetadata <-
-    setSeabugMetadata (wrap nftData { nftId = newNft }) txDatumsRedeemerTxIns
+    setSeabugMetadata (wrap nftData { nftId = newNft }) curr
+      txDatumsRedeemerTxIns
   pure $ txWithMetadata /\ curr /\ newName
 
 -- | Set metadata on the transaction for the given NFT
 setSeabugMetadata
   :: forall (r :: Row Type)
    . NftData
+  -> CurrencySymbol -- | The currency symbol of the self-governed nft
   -> UnattachedUnbalancedTx
   -> Contract r UnattachedUnbalancedTx
-setSeabugMetadata (NftData nftData) tx = do
+setSeabugMetadata (NftData nftData) sgNftCurr tx = do
   let
     nftCollection = unwrap nftData.nftCollection
     nftId = unwrap nftData.nftId
     natToShare nat = liftContractM "Invalid share"
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
-    policyId = Value.currencyMPSHash nftCollection.collectionNftCs
+    policyId = Value.currencyMPSHash sgNftCurr
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
   setTxMetadata tx $ SeabugMetadata

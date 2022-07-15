@@ -27,6 +27,7 @@ You can edit this file as you like.
   , "monad-logger"
   , "mote"
   , "newtype"
+  , "nonempty"
   , "ordered-collections"
   , "parallel"
   , "partial"
