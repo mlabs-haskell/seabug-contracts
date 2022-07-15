@@ -1,7 +1,8 @@
 module Seabug.CallContract
   ( callMarketPlaceBuy
-  , callMarketPlaceListNft
   , callMarketPlaceBuyTest
+  , callMarketPlaceListNft
+  , callMint
   ) where
 
 import Contract.Prelude
@@ -15,7 +16,11 @@ import Contract.Monad
   , runContract_
   )
 import Contract.Numeric.Natural (toBigInt)
-import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
+import Contract.Prim.ByteArray
+  ( byteArrayToHex
+  , hexToByteArray
+  , hexToByteArrayUnsafe
+  )
 import Contract.Transaction
   ( TransactionInput(TransactionInput)
   , TransactionOutput(TransactionOutput)
@@ -38,17 +43,21 @@ import Data.Log.Level (LogLevel(..))
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
-import Effect.Aff (error)
+import Effect.Aff (delay, error)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import Partial.Unsafe (unsafePartial)
 import Plutus.Conversion (fromPlutusAddress)
+import Seabug.Contract.CnftMint (mintCnft)
 import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
 import Seabug.Contract.MarketPlaceListNft (ListNftResult, marketPlaceListNft)
+import Seabug.Contract.Mint (mintWithCollection)
 import Seabug.Metadata.Share (unShare)
 import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Seabug.Types
-  ( NftCollection(NftCollection)
+  ( MintCnftParams
+  , MintParams
+  , NftCollection(NftCollection)
   , NftData(NftData)
   , NftId(NftId)
   )
@@ -66,6 +75,38 @@ import Wallet (mkNamiWalletAff)
 -- | Exists temporarily for testing purposes
 callMarketPlaceBuyTest :: String -> Effect (Promise String)
 callMarketPlaceBuyTest = Promise.fromAff <<< pure
+
+callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
+callMint cfg args = Promise.fromAff do
+  contractConfig <- buildContractConfig cfg
+  mintCnftParams /\ mintParams <- liftEffect $ liftEither $ buildMintArgs args
+
+  -- Uncomment here to mint the cnft
+  -- log "Minting cnft..."
+  -- cnft <- runContract contractConfig $ mintCnft mintCnftParams
+
+  -- Uncomment here to mint the sgNft, after updating `curr` for the new cnft
+  -- curr <- liftM (error "Bad curr")
+  --   ( mkCurrencySymbol
+  --       ( hexToByteArrayUnsafe
+  --           "47cac61ad42cad00878dcd60793cffeeffc478169ac1ff33988054e5"
+  --       )
+  --   )
+  -- tn <- liftM (error "Bad tn") (mkTokenName (hexToByteArrayUnsafe "abcdef"))
+  -- let cnft = curr /\ tn
+  -- log "Minting nft..."
+  -- runContract contractConfig $ mintWithCollection cnft mintParams
+
+  pure unit
+
+-- TODO: we can use this if we need for `callMint`, but I think
+-- `awaitTxConfirmed` is coming soon to CTL
+countToZero :: Int -> Aff Unit
+countToZero n =
+  unless (n <= 0) do
+    log $ "Waiting before we try to unlock: " <> show n
+    (delay <<< wrap) 1000.0
+    countToZero (n - 1)
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 --   Returns a JS promise holding no data.
@@ -142,6 +183,14 @@ type ListNftResultOut =
           }
       , ipfsHash :: String
       }
+  }
+
+type MintArgs =
+  { imageUri :: String
+  , tokenNameString :: String
+  , name :: String
+  , description :: String
+  , price :: BigInt -- Natural
   }
 
 buildContractConfig
@@ -293,3 +342,26 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
       , daoScript
       , daoShare
       }
+
+buildMintArgs :: MintArgs -> Either Error (MintCnftParams /\ MintParams)
+buildMintArgs
+  { imageUri
+  , tokenNameString
+  , name
+  , description
+  , price
+  } = do
+  price' <- note (error $ "Invalid price: " <> show price)
+    $ Nat.fromBigInt price
+  let
+    mintCnftParams = wrap { imageUri, tokenNameString, name, description }
+    -- TODO: Put these hard coded params in a better place
+    mintParams = wrap
+      { authorShare: Nat.fromInt' 500
+      , daoShare: Nat.fromInt' 500
+      , price: price'
+      , lockLockup: BigInt.fromInt 5
+      , lockLockupEnd: Slot $ BigNum.fromInt 5
+      , feeVaultKeys: []
+      }
+  pure (mintCnftParams /\ mintParams)
