@@ -54,8 +54,9 @@ mintWithCollection
       { price, lockLockup, lockLockupEnd, authorShare, daoShare }
   ) = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
+  networkId <- getNetworkId
   addr <- liftContractM "Cannot get user address" $
-    payPubKeyHashEnterpriseAddress TestnetId owner
+    payPubKeyHashEnterpriseAddress networkId owner
   utxos <- liftedM "Cannot get user utxos" $ utxosAt addr
   currentSlot <- slotFromTip <$> getTip
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator

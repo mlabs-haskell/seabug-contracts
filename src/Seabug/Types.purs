@@ -6,21 +6,17 @@ module Seabug.Types
   , NftCollection(..)
   , NftData(..)
   , NftId(..)
+  , MintCnftParams(..)
   , class Hashable
   , hash
   ) where
 
 import Contract.Prelude
 
-import Contract.Value
-  ( CurrencySymbol
-  , TokenName
-  , getCurrencySymbol
-  , getTokenName
-  )
-import Contract.Monad (Contract)
 import Contract.Address (PaymentPubKeyHash, PubKeyHash)
 import Contract.Aeson as Aeson
+import Contract.Monad (Contract)
+import Contract.Numeric.Natural (Natural, toBigInt)
 import Contract.PlutusData
   ( class FromData
   , class ToData
@@ -28,18 +24,35 @@ import Contract.PlutusData
   , fromData
   , toData
   )
-import Contract.Prim.ByteArray
-  ( ByteArray
-  , byteArrayFromIntArrayUnsafe
-  )
-import Contract.Numeric.Natural (Natural, toBigInt)
+import Contract.Prim.ByteArray (ByteArray, byteArrayFromIntArrayUnsafe)
 import Contract.Scripts (ValidatorHash)
 import Contract.Time (Slot)
+import Contract.Value
+  ( CurrencySymbol
+  , TokenName
+  , getCurrencySymbol
+  , getTokenName
+  )
 import Data.Argonaut as Json
 import Data.BigInt (BigInt, fromInt, toInt)
 import Hashing (blake2b256Hash)
 import Partial.Unsafe (unsafePartial)
 import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
+
+newtype MintCnftParams = MintCnftParams
+  { imageUrl :: String
+  -- | The token name of the collection nft. Will be base64 encoded
+  , tokenNameString :: String
+  , name :: String
+  , description :: String
+  }
+
+derive instance Generic MintCnftParams _
+derive instance Newtype MintCnftParams _
+derive newtype instance Eq MintCnftParams
+
+instance Show MintCnftParams where
+  show = genericShow
 
 -- Field names have been simplified due to row polymorphism. Please let me know
 -- if the field names must be exact.
