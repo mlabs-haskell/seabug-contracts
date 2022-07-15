@@ -3,8 +3,8 @@ module Seabug.Contract.Mint where
 import Contract.Prelude
 
 import Contract.Address
-  ( NetworkId(..)
-  , Slot
+  ( Slot
+  , getNetworkId
   , ownPaymentPubKeyHash
   , payPubKeyHashEnterpriseAddress
   )
@@ -26,7 +26,7 @@ import Contract.Value
 import Seabug.Contract.MarketPlaceBuy (setSeabugMetadata)
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidator)
-import Seabug.Token as Token
+import Seabug.MintingPolicy as MintingPolicy
 import Seabug.Types
   ( LockDatum(..)
   , MarketplaceDatum(..)
@@ -76,14 +76,10 @@ mintWithCollection
       , daoScript: marketplaceValidator'.validatorHash
       , daoShare
       }
-  -- TODO: check if we should be using Token or MintingPolicy, they
-  -- seem to be the same script
-  unappliedMintingPolicy <- liftContractE Token.unappliedMintingPolicy
-  policy <- liftedM "Could not get minting policy" $ Token.policy collection
-    unappliedMintingPolicy
+  policy <- liftedE $ MintingPolicy.mkMintingPolicy collection
   curr <- liftedM "Could not get currency symbol" $ liftAff $
     scriptCurrencySymbol policy
-  tn <- liftedM "Could not get token name" $ Token.mkTokenName nft
+  tn <- liftedM "Could not get token name" $ MintingPolicy.mkTokenName nft
   eraSummaries <- getEraSummaries
   systemStart <- getSystemStart
   now <- liftedE $ liftAff $ liftEffect $

@@ -25,7 +25,7 @@ import Contract.ScriptLookups
   , typedValidatorLookups
   , unspentOutputs
   ) as ScriptLookups
-import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
+import Contract.Scripts (typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( TransactionOutput(TransactionOutput)
   , balanceAndSignTxE
@@ -48,11 +48,10 @@ import Data.BigInt (BigInt, fromInt)
 import Data.BigInt as BigInt
 import Data.Map (insert, toUnfoldable)
 import Data.String.Common (joinWith)
-import Seabug.Metadata.Types (SeabugMetadata(..))
-import Seabug.Metadata.Share (mkShare)
 import Seabug.MarketPlace (marketplaceValidator)
-import Seabug.MintingPolicy (mintingPolicy)
-import Seabug.Token (mkTokenName)
+import Seabug.Metadata.Share (mkShare)
+import Seabug.Metadata.Types (SeabugMetadata(..))
+import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
   ( MarketplaceDatum(MarketplaceDatum)
   , MintAct(ChangeOwner)
@@ -101,7 +100,6 @@ mkMarketplaceTx (NftData nftData) = do
   let nftCollection = unwrap nftData.nftCollection
   pkh <- liftedM "marketplaceBuy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
-  policy' <- liftedE $ pure mintingPolicy
   log $ "policy args: " <> joinWith "; "
     [ "collectionNftCs: " <> show nftCollection.collectionNftCs
     , "lockingScript: " <> show nftCollection.lockingScript
@@ -110,14 +108,7 @@ mkMarketplaceTx (NftData nftData) = do
     , "daoScript: " <> show nftCollection.daoScript
     , "daoShare: " <> show nftCollection.daoShare
     ]
-  policy <- liftedE $ applyArgs policy'
-    [ toData nftCollection.collectionNftCs
-    , toData nftCollection.lockingScript
-    , toData nftCollection.author
-    , toData nftCollection.authorShare
-    , toData nftCollection.daoScript
-    , toData nftCollection.daoShare
-    ]
+  policy <- liftedE $ mkMintingPolicy $ wrap nftCollection
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
     $ liftAff
