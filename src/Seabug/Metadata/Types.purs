@@ -5,15 +5,8 @@ module Seabug.Metadata.Types
 
 import Prelude
 
-import Aeson
-  ( class DecodeAeson
-  , JsonDecodeError
-      ( TypeMismatch
-      )
-  , caseAesonObject
-  , decodeAeson
-  , getField
-  )
+import Aeson (class DecodeAeson, JsonDecodeError(..), caseAesonObject, getField)
+import Contract.Value (CurrencySymbol, mkCurrencySymbol)
 import Data.BigInt (fromInt) as BigInt
 import Data.Either (Either(Left), note)
 import Data.Generic.Rep (class Generic)
@@ -21,26 +14,30 @@ import Data.Map (toUnfoldable) as Map
 import Data.Maybe (Maybe(Nothing), fromJust)
 import Data.Newtype (class Newtype, wrap)
 import Data.Show.Generic (genericShow)
+import Data.String (Pattern(..), stripPrefix)
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested ((/\))
 import FromData (class FromData, fromData)
-import Metadata.Helpers (unsafeMkKey, lookupKey, lookupMetadata)
-import Seabug.Metadata.Share (Share, mkShare)
 import Metadata.FromMetadata (class FromMetadata, fromMetadata)
+import Metadata.Helpers (unsafeMkKey, lookupKey, lookupMetadata)
 import Metadata.MetadataType (class MetadataType, metadataLabel)
 import Metadata.ToMetadata (class ToMetadata, toMetadata)
 import Partial.Unsafe (unsafePartial)
 import Plutus.Types.AssocMap (Map(Map)) as AssocMap
+import Seabug.Metadata.Share (Share, mkShare)
+import Serialization.Hash
+  ( ScriptHash
+  , ed25519KeyHashFromBytes
+  , scriptHashFromBytes
+  )
 import ToData (class ToData, toData)
-import Serialization.Hash (ScriptHash, scriptHashFromBytes)
 import Type.Proxy (Proxy(Proxy))
 import Types.ByteArray (ByteArray, hexToByteArray)
-import Types.RawBytes (hexToRawBytesUnsafe)
 import Types.Natural (Natural)
 import Types.PlutusData (PlutusData(Map))
 import Types.PubKeyHash (PubKeyHash)
+import Types.RawBytes (hexToRawBytes, hexToRawBytesUnsafe)
 import Types.Scripts (MintingPolicyHash, ValidatorHash)
-import Contract.Value (CurrencySymbol, mkCurrencySymbol)
 import Types.TokenName (TokenName, mkTokenName)
 import Types.TransactionMetadata (TransactionMetadatum(MetadataMap))
 
@@ -180,24 +177,24 @@ instance DecodeAeson SeabugMetadata where
       $ \o -> do
           collectionNftCS <-
             note (TypeMismatch "Invalid ByteArray")
-              <<< (mkCurrencySymbol <=< hexToByteArray)
+              <<<
+                ( mkCurrencySymbol <=< hexToByteArray <=<
+                    removeMetadataBytesPrefix
+                )
               =<< getField o "collectionNftCS"
           collectionNftTN <-
             note (TypeMismatch "expected ASCII-encoded `TokenName`")
-              <<< (mkTokenName <=< hexToByteArray)
+              <<< (mkTokenName <=< hexToByteArray <=< removeMetadataBytesPrefix)
               =<< getField o "collectionNftTN"
           lockingScript <-
             map wrap
               <<< decodeScriptHash =<< getField o "lockingScript"
-          authorPkh <-
-            map wrap
-              <<< decodeAeson =<< getField o "authorPkh"
+          authorPkh <- decodePkh =<< getField o "authorPkh"
           authorShare <- decodeShare =<< getField o "authorShare"
           marketplaceScript <- map wrap <<< decodeScriptHash
             =<< getField o "marketplaceScript"
           marketplaceShare <- decodeShare =<< getField o "marketplaceShare"
-          ownerPkh <- map wrap <<< decodeAeson =<< getField o
-            "ownerPkh"
+          ownerPkh <- decodePkh =<< getField o "ownerPkh"
           ownerPrice <- getField o "ownerPrice"
           pure $ SeabugMetadata
             { -- Not used in the endpoints where we parse the metadata, so we
@@ -220,6 +217,16 @@ instance DecodeAeson SeabugMetadata where
             , ownerPrice
             }
     where
+    decodePkh :: String -> Either JsonDecodeError PubKeyHash
+    decodePkh =
+      map wrap <<<
+        ( note (TypeMismatch "Invalid Ed25519KeyHash") <<<
+            ed25519KeyHashFromBytes
+            <=< note (TypeMismatch "Invalid ByteArray") <<<
+              hexToRawBytes
+        ) <=< note (TypeMismatch "Expected 0x prefix in authorPkh")
+        <<< removeMetadataBytesPrefix
+
     decodeShare :: Int -> Either JsonDecodeError Share
     decodeShare = note (TypeMismatch "Expected int between 0 and 10000")
       <<< mkShare
@@ -228,7 +235,13 @@ instance DecodeAeson SeabugMetadata where
     decodeScriptHash =
       note
         (TypeMismatch "Expected hex-encoded script hash")
-        <<< (scriptHashFromBytes <<< wrap <=< hexToByteArray)
+        <<<
+          ( scriptHashFromBytes <<< wrap <=< hexToByteArray <=<
+              removeMetadataBytesPrefix
+          )
+
+    removeMetadataBytesPrefix :: String -> Maybe String
+    removeMetadataBytesPrefix = stripPrefix (Pattern "0x")
 
 newtype SeabugMetadataDelta = SeabugMetadataDelta
   { policyId :: MintingPolicyHash

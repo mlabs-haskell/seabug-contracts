@@ -40,7 +40,7 @@ import Partial.Unsafe (unsafePartial)
 import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
 
 newtype MintCnftParams = MintCnftParams
-  { imageUrl :: String
+  { imageUri :: String
   -- | The token name of the collection nft. Will be base64 encoded
   , tokenNameString :: String
   , name :: String

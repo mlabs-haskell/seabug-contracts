@@ -13,8 +13,7 @@ import Affjax (printError)
 import Affjax as Affjax
 import Affjax.RequestHeader as Affjax.RequestHeader
 import Affjax.ResponseFormat as Affjax.ResponseFormat
-import Contract.Monad (Contract)
-import Contract.Prim.ByteArray (byteArrayToHex)
+import Contract.Prim.ByteArray (ByteArray, byteArrayToHex)
 import Contract.Value
   ( CurrencySymbol
   , TokenName
@@ -28,6 +27,7 @@ import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Monad.Reader.Trans (asks)
 import Control.Monad.Trans.Class (lift)
 import Data.Argonaut as Argonaut
+import Data.Array (head)
 import Data.Bifunctor (lmap)
 import Data.Function (on)
 import Data.HTTP.Method (Method(GET))
@@ -93,12 +93,28 @@ getFullSeabugMetadata a@(currSym /\ _) projectId =
     ipfsHash <- getIpfsHash seabugMetadata
     pure { seabugMetadata, ipfsHash }
 
+-- | Convert a byte array into a string as represented in the metadata
+-- | json, i.e. hex encoded with "0x" prepended.
+metadataBytesString :: ByteArray -> String
+metadataBytesString = ("0x" <> _) <<< byteArrayToHex
+
 getIpfsHash
   :: SeabugMetadata
   -> BlockfrostFetch Hash
 getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
-  except <<< (decodeField "image" <=< decodeField "onchain_metadata")
-    =<< mkGetRequest ("assets/" <> mkAsset collectionNftCS collectionNftTN)
+  r <- mkGetRequest ("assets/" <> mkAsset collectionNftCS collectionNftTN)
+  imageArray <- except $
+    ( decodeField "image" <=< decodeField tokenNameKey
+        <=< decodeField currSymKey
+        <=< decodeField "onchain_metadata"
+    ) r
+  except $ note (BlockfrostOtherError "Empty image array") $ head imageArray
+  where
+  currSymKey :: String
+  currSymKey = metadataBytesString $ getCurrencySymbol collectionNftCS
+
+  tokenNameKey :: String
+  tokenNameKey = metadataBytesString $ getTokenName collectionNftTN
 
 getMintingTxSeabugMetadata
   :: forall (r :: Row Type)
@@ -126,7 +142,7 @@ getMintingTxSeabugMetadata currSym txHash = do
       Aeson.decodeAeson =<< Aeson.getField md currSymKey
 
   currSymKey :: String
-  currSymKey = byteArrayToHex $ getCurrencySymbol currSym
+  currSymKey = metadataBytesString $ getCurrencySymbol currSym
 
 getMintingTxHash
   :: forall (r :: Row Type)
