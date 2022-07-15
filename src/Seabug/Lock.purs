@@ -20,7 +20,7 @@ mkLockScript
   -> Contract r (Either QueryM.ClientError Validator)
 mkLockScript collectionNftCs lockup lockupEnd = do
   script <- liftContractE unappliedLockScript
-  applyArgs script [toData collectionNftCs, toData lockup, toData lockupEnd]
+  applyArgs script [ toData collectionNftCs, toData lockup, toData lockupEnd ]
 
 unappliedLockScript :: Either JsonDecodeError Validator
 unappliedLockScript = jsonReader "validator" _unappliedLockScript
