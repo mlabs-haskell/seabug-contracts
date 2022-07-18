@@ -13,7 +13,7 @@ import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
 import Contract.Prim.ByteArray (hexToByteArray)
 import Contract.ScriptLookups as Lookups
 import Contract.Scripts (mintingPolicyHash)
-import Contract.Transaction (balanceAndSignTxE, submit)
+import Contract.Transaction (TransactionHash, balanceAndSignTxE, submit)
 import Contract.TxConstraints as Constraints
 import Contract.Utxos (utxosAt)
 import Contract.Value
@@ -33,7 +33,7 @@ import Seabug.Types (MintCnftParams(..))
 mintCnft
   :: forall (r :: Row Type)
    . MintCnftParams
-  -> Contract r (CurrencySymbol /\ TokenName)
+  -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName))
 mintCnft (MintCnftParams params) = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
   ownerStake <- liftedM "Cannot get StakePubKeyHash" ownStakePubKeyHash
@@ -81,4 +81,4 @@ mintCnft (MintCnftParams params) = do
   transactionHash <- submit signedTx
   log $ "CNFT Mint transaction successfully submitted with hash: "
     <> show transactionHash
-  pure (curr /\ tn)
+  pure (transactionHash /\ curr /\ tn)

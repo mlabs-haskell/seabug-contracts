@@ -16,14 +16,11 @@ import Contract.Monad
   , runContract_
   )
 import Contract.Numeric.Natural (toBigInt)
-import Contract.Prim.ByteArray
-  ( byteArrayToHex
-  , hexToByteArray
-  , hexToByteArrayUnsafe
-  )
+import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
 import Contract.Transaction
   ( TransactionInput(TransactionInput)
   , TransactionOutput(TransactionOutput)
+  , awaitTxConfirmed
   )
 import Contract.Value
   ( CurrencySymbol
@@ -43,7 +40,7 @@ import Data.Log.Level (LogLevel(..))
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
-import Effect.Aff (delay, error)
+import Effect.Aff (error)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import Partial.Unsafe (unsafePartial)
@@ -80,33 +77,18 @@ callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
   mintCnftParams /\ mintParams <- liftEffect $ liftEither $ buildMintArgs args
-
-  -- Uncomment here to mint the cnft
-  -- log "Minting cnft..."
-  -- cnft <- runContract contractConfig $ mintCnft mintCnftParams
-
-  -- Uncomment here to mint the sgNft, after updating `curr` for the new cnft
-  -- curr <- liftM (error "Bad curr")
-  --   ( mkCurrencySymbol
-  --       ( hexToByteArrayUnsafe
-  --           "47cac61ad42cad00878dcd60793cffeeffc478169ac1ff33988054e5"
-  --       )
-  --   )
-  -- tn <- liftM (error "Bad tn") (mkTokenName (hexToByteArrayUnsafe "abcdef"))
-  -- let cnft = curr /\ tn
-  -- log "Minting nft..."
-  -- runContract contractConfig $ mintWithCollection cnft mintParams
-
-  pure unit
-
--- TODO: we can use this if we need for `callMint`, but I think
--- `awaitTxConfirmed` is coming soon to CTL
-countToZero :: Int -> Aff Unit
-countToZero n =
-  unless (n <= 0) do
-    log $ "Waiting before we try to unlock: " <> show n
-    (delay <<< wrap) 1000.0
-    countToZero (n - 1)
+  runContract contractConfig $ do
+    log "Minting cnft..."
+    txHash /\ cnft <- mintCnft mintCnftParams
+    log $ "Waiting for confirmation of cnft transaction: " <> show txHash
+    awaitTxConfirmed txHash
+    log $ "Cnft transaction confirmed: " <> show txHash
+    log $ "Minted cnft: " <> show cnft
+    log "Minting nft..."
+    sgNftTxHash <- mintWithCollection cnft mintParams
+    log $ "Waiting for confirmation of nft transaction: " <> show sgNftTxHash
+    awaitTxConfirmed sgNftTxHash
+    log $ "Nft transaction confirmed: " <> show sgNftTxHash
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 --   Returns a JS promise holding no data.

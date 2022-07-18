@@ -149,7 +149,7 @@ let additions =
           , "untagged-union"
           ]
         , repo = "https://github.com/mlabs-haskell/purescript-aeson.git"
-        , version = "69bd18c4a9cffdebc45c55d2448740721a91854c"
+        , version = "286862a975f4bafbef15540c365bbbb0480e0bf7"
         }
       , aeson-helpers =
         { dependencies =
@@ -331,8 +331,8 @@ let additions =
           -- https://github.com/Plutonomicon/cardano-transaction-lib/pull/696
           -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
           -- Commit is from our branch calum/metadata-invalid-char-fix which is based off this PR and
-          -- includes a small fix to get the build working.
-        , version = "8ff7b75d2048a9ea9d625f97d27176f59b09fb6a"
+          -- includes a small fix to get the build working. Also updated to include `awaitTxConfirmed`.
+        , version = "32194c502e4a068bf99388b05c708f81612d7541"
         }
       }
 in upstream // additions

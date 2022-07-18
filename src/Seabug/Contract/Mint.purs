@@ -14,7 +14,7 @@ import Contract.PlutusData (toData)
 import Contract.ScriptLookups as Lookups
 import Contract.Scripts (validatorHash)
 import Contract.Time (from, getEraSummaries, getSystemStart, slotToPosixTime)
-import Contract.Transaction (balanceAndSignTxE, submit)
+import Contract.Transaction (TransactionHash(..), balanceAndSignTxE, submit)
 import Contract.TxConstraints as Constraints
 import Contract.Utxos (utxosAt)
 import Contract.Value
@@ -47,7 +47,7 @@ mintWithCollection
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName
   -> MintParams
-  -> Contract r Unit
+  -> Contract r TransactionHash
 mintWithCollection
   (collectionNftCs /\ collectionNftTn)
   ( MintParams
@@ -116,3 +116,4 @@ mintWithCollection
   transactionHash <- submit signedTx
   log $ "Mint transaction successfully submitted with hash: " <> show
     transactionHash
+  pure transactionHash

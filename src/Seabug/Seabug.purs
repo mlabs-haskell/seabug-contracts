@@ -32,9 +32,9 @@ main = callMint
   , logLevel: "Trace"
   }
   { -- base36 ipfs cid obtained from mint-nft.sh
-    imageUri: "ipfs://k2cwuee3arxg398hwxx6c0iferxitu126xntuzg8t765oo020h5y6npn"
+    imageUri: "ipfs://k2cwuebwvb6kdiwob6sb2yqnz38r0yv72q1xijbts9ep5lq3nm8rw3i4"
   , tokenNameString: "abcdef"
-  , name: "Allium"
+  , name: "Piaggio Ape"
   , description: "Seabug Testing"
-  , price: BigInt.fromInt 10
+  , price: BigInt.fromInt (12 * 1000000)
   }
