@@ -17,16 +17,13 @@ The minting process currently requires some manual steps. To mint a new NFT:
 - Run `make run-dev` and open the link from the console in chrome; this will trigger the minting
   - If Nami/Gero are giving you trouble, this snippet can be used to use a key wallet instead:
     ```
-    wallet =
-        cborBytesFromAscii "<secret key>"
-        >>= unwrap
-        >>> wrap
-        >>> privateKeyFromBytes
-        >>= wrap
-        >>> flip mkKeyWalletFromPrivateKey Nothing
-        >>> pure
+    privateKey <- liftM (error "Failed to parse private key") $
+      privateKeyFromBytes
+          =<< hexToRawBytes "<secret key>"
+    let wallet = Just $ mkKeyWallet (wrap privateKey) Nothing
     ```
   - The secret key can be obtained through e.g. `seabug/scripts/prepare-wallet.sh` (make sure to add ada to that wallet)
+    - Note you may have to remove the "5820" from the start of the "cborHex" in the skey file
 - Once the sgNft mint transaction has gone through, add its hash [here](https://github.com/mlabs-haskell/seabug-contracts/blob/cda88824f87e0b961b738c66a428b7ade77454be/src/Seabug/Contract/MarketPlaceListNft.purs#L63)
 - Add the wallet that you minted with as an artist to the
   `nft-marketplace-server` database with `admin/create_artist`
