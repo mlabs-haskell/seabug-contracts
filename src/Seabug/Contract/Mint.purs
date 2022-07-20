@@ -14,7 +14,7 @@ import Contract.PlutusData (toData)
 import Contract.ScriptLookups as Lookups
 import Contract.Scripts (validatorHash)
 import Contract.Time (from, getEraSummaries, getSystemStart, slotToPosixTime)
-import Contract.Transaction (TransactionHash(..), balanceAndSignTxE, submit)
+import Contract.Transaction (TransactionHash, balanceAndSignTxE, submit)
 import Contract.TxConstraints as Constraints
 import Contract.Utxos (utxosAt)
 import Contract.Value
@@ -23,7 +23,7 @@ import Contract.Value
   , scriptCurrencySymbol
   , singleton
   )
-import Seabug.Contract.MarketPlaceBuy (setSeabugMetadata)
+import Seabug.Contract.Util (setSeabugMetadata)
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy as MintingPolicy

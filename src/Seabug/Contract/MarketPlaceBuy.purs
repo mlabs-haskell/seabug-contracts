@@ -1,14 +1,11 @@
 module Seabug.Contract.MarketPlaceBuy
   ( marketplaceBuy
   , mkMarketplaceTx
-  -- TODO: move this function
-  , setSeabugMetadata
   ) where
 
 import Contract.Prelude
 
 import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
-import Contract.AuxiliaryData (setTxMetadata)
 import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.PlutusData
@@ -39,18 +36,15 @@ import Contract.TxConstraints
   , mustSpendScriptOutput
   )
 import Contract.Utxos (utxosAt)
-import Contract.Value (CurrencySymbol)
 import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
 import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
-import Data.BigInt as BigInt
 import Data.Map (insert, toUnfoldable)
 import Data.String.Common (joinWith)
+import Seabug.Contract.Util (setSeabugMetadata)
 import Seabug.MarketPlace (marketplaceValidator)
-import Seabug.Metadata.Share (mkShare)
-import Seabug.Metadata.Types (SeabugMetadata(..))
 import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
   ( MarketplaceDatum(MarketplaceDatum)
@@ -220,34 +214,3 @@ mkMarketplaceTx (NftData nftData) = do
     setSeabugMetadata (wrap nftData { nftId = newNft }) curr
       txDatumsRedeemerTxIns
   pure $ txWithMetadata /\ curr /\ newName
-
--- | Set metadata on the transaction for the given NFT
-setSeabugMetadata
-  :: forall (r :: Row Type)
-   . NftData
-  -> CurrencySymbol -- | The currency symbol of the self-governed nft
-  -> UnattachedUnbalancedTx
-  -> Contract r UnattachedUnbalancedTx
-setSeabugMetadata (NftData nftData) sgNftCurr tx = do
-  let
-    nftCollection = unwrap nftData.nftCollection
-    nftId = unwrap nftData.nftId
-    natToShare nat = liftContractM "Invalid share"
-      $ mkShare
-      =<< BigInt.toInt (toBigInt nat)
-    policyId = Value.currencyMPSHash sgNftCurr
-  authorShareValidated <- natToShare nftCollection.authorShare
-  marketplaceShareValidated <- natToShare nftCollection.daoShare
-  setTxMetadata tx $ SeabugMetadata
-    { policyId
-    , mintPolicy: mempty
-    , collectionNftCS: nftCollection.collectionNftCs
-    , lockingScript: nftCollection.lockingScript
-    , collectionNftTN: nftId.collectionNftTn
-    , authorPkh: unwrap nftCollection.author
-    , authorShare: authorShareValidated
-    , marketplaceScript: nftCollection.daoScript
-    , marketplaceShare: marketplaceShareValidated
-    , ownerPkh: unwrap nftId.owner
-    , ownerPrice: nftId.price
-    }
