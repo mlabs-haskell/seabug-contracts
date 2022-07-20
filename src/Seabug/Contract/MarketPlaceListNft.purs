@@ -8,6 +8,7 @@ import Contract.Prelude
 
 import Contract.Address (getNetworkId, typedValidatorEnterpriseAddress)
 import Contract.Monad (Contract, liftContractE, liftedM)
+import Contract.Numeric.Natural as Natural
 import Contract.PlutusData (fromData, getDatumsByHashes)
 import Contract.Prim.ByteArray (hexToByteArrayUnsafe)
 import Contract.Transaction
@@ -60,17 +61,13 @@ marketPlaceListNft = do
             =<< (_ `Map.lookup` datums)
             =<< out.dataHash
         guard $ valueOf out.amount curr name == one
-        -- TODO: this is a temporary solution to only show NFTs
-        -- known to work. When minting an NFT, the sgNft's
-        -- transaction hash should be added here
-        guard $ any
-          ( \txHash -> (unwrap input # _.transactionId) ==
-              (wrap $ hexToByteArrayUnsafe txHash)
-          )
-          [ "db55d6708d1d38c3a85b498c89cf34ef1bcf40295092fcbff2550daefe289cd1"
-          , "ee692437895d27c92f34f6fb43ccc8ed14fec0a4ea2274073dcf07a8cf0662a6"
-          ]
         metadata <- MaybeT $ map hush $
           getFullSeabugMetadataWithBackoff (curr /\ name) projectId
+        -- TODO: this is a temporary solution to only show NFTs known
+        -- to work. This filter catches a couple new nfts whose price
+        -- I put too low. The old nfts are caught above because their
+        -- metadata won't be parsed.
+        guard $ (unwrap metadata.seabugMetadata # _.ownerPrice) >=
+          (Natural.fromInt' (10 * 1000000))
         pure { input, output, metadata }
   pure $ catMaybes withMetadata
