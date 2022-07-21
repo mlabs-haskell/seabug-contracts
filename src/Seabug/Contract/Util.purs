@@ -1,4 +1,7 @@
-module Seabug.Contract.Util (setSeabugMetadata) where
+module Seabug.Contract.Util
+  ( minAdaOnlyUTxOValue
+  , setSeabugMetadata
+  ) where
 
 import Contract.Prelude
 
@@ -8,10 +11,14 @@ import Contract.Numeric.Natural (toBigInt)
 import Contract.ScriptLookups (UnattachedUnbalancedTx)
 import Contract.Value (CurrencySymbol)
 import Contract.Value as Value
+import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Seabug.Metadata.Share (mkShare)
 import Seabug.Metadata.Types (SeabugMetadata(..))
 import Seabug.Types (NftData(..))
+
+minAdaOnlyUTxOValue :: BigInt
+minAdaOnlyUTxOValue = BigInt.fromInt 1_000_000
 
 -- | Set metadata on the transaction for the given NFT
 setSeabugMetadata

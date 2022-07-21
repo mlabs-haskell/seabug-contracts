@@ -43,7 +43,7 @@ import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
 import Data.String.Common (joinWith)
-import Seabug.Contract.Util (setSeabugMetadata)
+import Seabug.Contract.Util (minAdaOnlyUTxOValue, setSeabugMetadata)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
@@ -52,9 +52,6 @@ import Seabug.Types
   , NftData(..)
   , NftId(NftId)
   )
-
-minAdaOnlyUTxOValue :: BigInt
-minAdaOnlyUTxOValue = fromInt 1_000_000
 
 -- TODO docstring
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit

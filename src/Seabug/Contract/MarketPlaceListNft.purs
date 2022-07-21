@@ -23,6 +23,7 @@ import Control.Monad.Reader (asks)
 import Control.Parallel (parTraverse)
 import Data.Array (catMaybes, mapMaybe)
 import Data.Map as Map
+import Seabug.Contract.Util (minAdaOnlyUTxOValue)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.Metadata (FullSeabugMetadata, getFullSeabugMetadataWithBackoff)
 import Seabug.Types (MarketplaceDatum(MarketplaceDatum))
@@ -68,6 +69,6 @@ marketPlaceListNft = do
         -- I put too low. The old nfts are caught above because their
         -- metadata won't be parsed.
         guard $ (unwrap metadata.seabugMetadata # _.ownerPrice) >=
-          (Natural.fromInt' (10 * 1000000))
+          (Natural.fromBigInt' minAdaOnlyUTxOValue)
         pure { input, output, metadata }
   pure $ catMaybes withMetadata
