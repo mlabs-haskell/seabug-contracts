@@ -65,7 +65,7 @@ newtype MintParams = MintParams
     price :: Natural
   , lockLockup :: BigInt
   , lockLockupEnd :: Slot
-  , feeVaultKeys :: Array PubKeyHash -- TODO: check if this is needed
+  , feeVaultKeys :: Array PubKeyHash
   }
 
 derive instance Generic MintParams _
