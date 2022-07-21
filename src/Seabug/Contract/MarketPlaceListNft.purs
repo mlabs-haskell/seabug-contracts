@@ -10,7 +10,6 @@ import Contract.Address (getNetworkId, typedValidatorEnterpriseAddress)
 import Contract.Monad (Contract, liftContractE, liftedM)
 import Contract.Numeric.Natural as Natural
 import Contract.PlutusData (fromData, getDatumsByHashes)
-import Contract.Prim.ByteArray (hexToByteArrayUnsafe)
 import Contract.Transaction
   ( TransactionInput
   , TransactionOutput(TransactionOutput)
