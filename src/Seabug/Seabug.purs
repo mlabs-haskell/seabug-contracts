@@ -1,7 +1,7 @@
 module Seabug
   ( module Seabug.CallContract
   , module QueryM.Utxos
-  , main
+  , mint
   ) where
 
 import Contract.Prelude
@@ -16,8 +16,8 @@ import Seabug.CallContract
   , callMint
   )
 
-main :: Effect (Promise Unit)
-main = callMint
+mint :: Effect (Promise Unit)
+mint = callMint
   { serverHost: "ctl.localho.st"
   , serverPort: 8080
   , serverSecureConn: false

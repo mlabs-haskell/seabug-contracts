@@ -30,6 +30,7 @@ import Metadata.Cip25 (Cip25Metadata(..), Cip25MetadataEntry(..))
 import Seabug.CnftMintPolicy (mkCnftMintingPolicy)
 import Seabug.Types (MintCnftParams(..))
 
+-- | Mint a collection NFT
 mintCnft
   :: forall (r :: Row Type)
    . MintCnftParams

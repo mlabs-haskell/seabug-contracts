@@ -43,6 +43,7 @@ slotFromTip :: Tip -> Slot
 slotFromTip TipAtGenesis = wrap $ BigNum.zero
 slotFromTip (Tip (ChainTip { slot })) = slot
 
+-- | Mint the self-governed NFT for the given collection.
 mintWithCollection
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName

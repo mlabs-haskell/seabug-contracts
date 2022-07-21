@@ -84,7 +84,7 @@ callMint cfg args = Promise.fromAff do
     awaitTxConfirmed txHash
     log $ "Cnft transaction confirmed: " <> show txHash
     log $ "Minted cnft: " <> show cnft
-    log "Minting nft..."
+    log "Minting sgNft..."
     sgNftTxHash <- mintWithCollection cnft mintParams
     log $ "Waiting for confirmation of nft transaction: " <> show sgNftTxHash
     awaitTxConfirmed sgNftTxHash

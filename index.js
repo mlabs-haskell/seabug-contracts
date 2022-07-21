@@ -36,4 +36,5 @@ exports.getWalletBalance = async () => {
   return sb.getWalletBalance();
 };
 
-// seabug.then((sb) => sb.main().then(() => console.log("Done")))
+// Uncomment this for manually minting new tokens (see README)
+// seabug.then((sb) => sb.mint().then(() => console.log("Done")))
