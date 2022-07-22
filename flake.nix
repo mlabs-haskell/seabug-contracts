@@ -24,7 +24,7 @@
       perSystem = nixpkgs.lib.genAttrs defaultSystems;
       nixpkgsFor = system: import nixpkgs {
         inherit system;
-        overlays = [ cardano-transaction-lib.overlay.${system} ];
+        overlays = [ cardano-transaction-lib.overlay ];
       };
       psProjectFor = system:
         let
@@ -43,7 +43,7 @@
         };
     in
     {
-      defaultPackage = perSystem (system: self.packages.${system}.seabug-contracts);
+      defaultPackage = perSystem (system: self.packages.${system}.seabug-contracts-bundle-web);
 
       packages = perSystem (system:
         let
