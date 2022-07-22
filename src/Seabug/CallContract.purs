@@ -72,11 +72,14 @@ callMarketPlaceBuyTest :: String -> Effect (Promise String)
 callMarketPlaceBuyTest = Promise.fromAff <<< pure
 
 callMarketPlaceFetchNft
-  :: ContractConfiguration -> TransactionInputOut -> Effect (Promise Unit)
+  :: ContractConfiguration
+  -> TransactionInputOut
+  -> Effect (Promise ListNftResultOut)
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
   txInput <- liftEffect $ liftEither $ buildTransactionInput args
-  runContract_ contractConfig (marketPlaceFetchNft txInput)
+  nftResult <- runContract contractConfig (marketPlaceFetchNft txInput)
+  pure $ buildNftList (unwrap contractConfig).networkId nftResult
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 --   Returns a JS promise holding no data.

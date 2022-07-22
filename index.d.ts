@@ -70,8 +70,8 @@ export type NftListing = {
 }
 
 export type Input = {
-    transaction_id: String,
-    input_index: number
+    transactionId: String,
+    inputIndex: number
 }
 
 export type Output = {
