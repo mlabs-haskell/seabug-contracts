@@ -63,7 +63,7 @@ mintCnft (MintCnftParams params) = do
     constraints = mconcat
       [ Constraints.mustMintValue value
       , Constraints.mustSpendPubKeyOutput oref
-      , Constraints.mustPayToPubKey owner value
+      , Constraints.mustPayToPubKeyAddress owner ownerStake value
       ]
   unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
   policyHash <- liftedM "Could not get minting policy hash" $ liftAff $

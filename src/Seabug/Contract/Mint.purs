@@ -6,7 +6,8 @@ import Contract.Address
   ( Slot
   , getNetworkId
   , ownPaymentPubKeyHash
-  , payPubKeyHashEnterpriseAddress
+  , ownStakePubKeyHash
+  , payPubKeyHashBaseAddress
   )
 import Contract.Chain (ChainTip(..), Tip(..), getTip)
 import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
@@ -55,9 +56,10 @@ mintWithCollection
       { price, lockLockup, lockLockupEnd, authorShare, daoShare }
   ) = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
+  ownerStake <- liftedM "Cannot get StakePubKeyHash" ownStakePubKeyHash
   networkId <- getNetworkId
   addr <- liftContractM "Cannot get user address" $
-    payPubKeyHashEnterpriseAddress networkId owner
+    payPubKeyHashBaseAddress networkId owner ownerStake
   utxos <- liftedM "Cannot get user utxos" $ utxosAt addr
   currentSlot <- slotFromTip <$> getTip
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator

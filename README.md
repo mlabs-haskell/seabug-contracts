@@ -20,9 +20,13 @@ The minting process currently requires some manual steps. To mint a new NFT:
     privateKey <- liftM (error "Failed to parse private key") $
       privateKeyFromBytes
           =<< hexToRawBytes "<secret key>"
-    let wallet = Just $ mkKeyWallet (wrap privateKey) Nothing
+    privateStakeKey <- liftM (error "Failed to parse private stake key")
+      $ privateKeyFromBytes
+      =<< hexToRawBytes "<secret stake key>"
+    let wallet = Just $ mkKeyWallet (wrap privateKey) (Just $ wrap privateStakeKey)
     ```
   - The secret key can be obtained through e.g. `seabug/scripts/prepare-wallet.sh` (make sure to add ada to that wallet)
     - Note you may have to remove the "5820" from the start of the "cborHex" in the skey file
+  - The stake key will also be necessary for minting, the command `cardano-cli stake-address key-gen --signing-key-file stake.skey --verification-key-file stake.vkey` can be used to get a stake key
 - Add the wallet that you minted with as an artist to the
   `nft-marketplace-server` database with `admin/create_artist`
