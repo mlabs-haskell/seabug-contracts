@@ -1,4 +1,3 @@
--- |
 module Seabug.Contract.Common
   ( NftResult
   ) where

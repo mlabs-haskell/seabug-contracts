@@ -27,11 +27,6 @@ exports.callMarketPlaceListNft = async (config) => {
   return sb.callMarketPlaceListNft(config)();
 };
 
-/**
- * Calls Seabug Contract 'marketPlaceFetchNft'.
- * Returns a promise holding the up to date data for the given utxo
- * reference.
- */
 exports.callMarketPlaceFetchNft = async (config, args) => {
   const sb = await seabug;
   return sb.callMarketPlaceFetchNft(config)(args)();

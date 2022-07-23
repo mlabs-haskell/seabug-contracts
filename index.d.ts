@@ -2,6 +2,11 @@ export function callMarketPlaceBuy(config: Config, args: BuyNftArgs):
     Promise<void>
 export function callMarketPlaceListNft(config: Config):
     Promise<Array<NftListing>>
+/**
+ * Fetch the info for a single NFT. Returns null if the given
+ * transaction input has been spent (for example if the NFT has been
+ * bought).
+ */
 export function callMarketPlaceFetchNft(config: Config, args: FetchNftArgs):
     Promise<NftListing?>
 export function connectWallet(): Promise<any>

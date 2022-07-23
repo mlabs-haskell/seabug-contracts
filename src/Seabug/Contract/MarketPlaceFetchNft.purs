@@ -5,7 +5,7 @@ module Seabug.Contract.MarketPlaceFetchNft
 
 import Contract.Prelude
 
-import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
+import Contract.Monad (Contract, liftContractM, liftedE, liftedM, logWarn')
 import Contract.PlutusData (fromData, getDatumByHash)
 import Contract.Transaction (TransactionInput, TransactionOutput(..))
 import Contract.Utxos (getUtxo)
@@ -14,6 +14,9 @@ import Seabug.Contract.Common (NftResult)
 import Seabug.Metadata (getFullSeabugMetadataWithBackoff)
 import Seabug.Types (MarketplaceDatum(..))
 
+-- | Fetch the info for a single NFT identified by a utxo
+-- | (`TransactionInput`). Returns `Nothing` if the given transaction
+-- | input has been spent (for example if the NFT has been bought).
 marketPlaceFetchNft
   :: forall (r :: Row Type)
    . TransactionInput
@@ -21,7 +24,7 @@ marketPlaceFetchNft
 marketPlaceFetchNft ref = do
   getUtxo ref >>= case _ of
     Nothing -> do
-      log "Could not find NFT utxo, it may have been spent"
+      logWarn' "Could not find NFT utxo, it may have been spent"
       pure Nothing
     Just output@(TransactionOutput nftTxOut) -> do
       datumHash <- liftContractM "Datum hash not available for NFT"
