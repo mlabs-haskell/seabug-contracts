@@ -37,6 +37,7 @@ import Control.Promise as Promise
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Data.Log.Level (LogLevel(..))
+import Data.Nullable (Nullable, notNull, null)
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
@@ -74,12 +75,14 @@ callMarketPlaceBuyTest = Promise.fromAff <<< pure
 callMarketPlaceFetchNft
   :: ContractConfiguration
   -> TransactionInputOut
-  -> Effect (Promise ListNftResultOut)
+  -> Effect (Promise (Nullable ListNftResultOut))
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
   txInput <- liftEffect $ liftEither $ buildTransactionInput args
-  nftResult <- runContract contractConfig (marketPlaceFetchNft txInput)
-  pure $ buildNftList (unwrap contractConfig).networkId nftResult
+  runContract contractConfig (marketPlaceFetchNft txInput) >>= case _ of
+    Nothing -> pure null
+    Just nftResult -> pure $ notNull $
+      buildNftList (unwrap contractConfig).networkId nftResult
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 --   Returns a JS promise holding no data.

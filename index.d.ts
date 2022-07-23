@@ -3,7 +3,7 @@ export function callMarketPlaceBuy(config: Config, args: BuyNftArgs):
 export function callMarketPlaceListNft(config: Config):
     Promise<Array<NftListing>>
 export function callMarketPlaceFetchNft(config: Config, args: FetchNftArgs):
-    Promise<NftListing>
+    Promise<NftListing?>
 export function connectWallet(): Promise<any>
 export function getWalletBalance(): Promise<any>
 

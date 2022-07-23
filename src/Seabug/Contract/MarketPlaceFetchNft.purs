@@ -17,17 +17,19 @@ import Seabug.Types (MarketplaceDatum(..))
 marketPlaceFetchNft
   :: forall (r :: Row Type)
    . TransactionInput
-  -> Contract (projectId :: String | r) NftResult
+  -> Contract (projectId :: String | r) (Maybe NftResult)
 marketPlaceFetchNft ref = do
-  output@(TransactionOutput nftTxOut) <- liftedM "Could not find NFT utxo" $
-    getUtxo
-      ref
-  datumHash <- liftContractM "Datum hash not available for NFT"
-    nftTxOut.dataHash
-  MarketplaceDatum { getMarketplaceDatum: datum } <-
-    liftedM "Could not get datum for NFT" $ getDatumByHash datumHash <#>
-      (_ >>= unwrap >>> fromData)
-  projectId <- asks $ unwrap >>> _.projectId
-  metadata <- liftedE $ liftAff $
-    getFullSeabugMetadataWithBackoff datum projectId
-  pure { input: ref, output, metadata }
+  getUtxo ref >>= case _ of
+    Nothing -> do
+      log "Could not find NFT utxo, it may have been spent"
+      pure Nothing
+    Just output@(TransactionOutput nftTxOut) -> do
+      datumHash <- liftContractM "Datum hash not available for NFT"
+        nftTxOut.dataHash
+      MarketplaceDatum { getMarketplaceDatum: datum } <-
+        liftedM "Could not get datum for NFT" $ getDatumByHash datumHash <#>
+          (_ >>= unwrap >>> fromData)
+      projectId <- asks $ unwrap >>> _.projectId
+      metadata <- liftedE $ liftAff $
+        getFullSeabugMetadataWithBackoff datum projectId
+      pure $ Just { input: ref, output, metadata }
