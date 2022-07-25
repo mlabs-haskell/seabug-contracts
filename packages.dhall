@@ -331,8 +331,8 @@ let additions =
           -- https://github.com/Plutonomicon/cardano-transaction-lib/pull/696
           -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
           -- Commit is from our branch calum/metadata-invalid-char-fix which is based off this PR and
-          -- includes a small fix to get the build working. Also updated to include `awaitTxConfirmed`.
-        , version = "32194c502e4a068bf99388b05c708f81612d7541"
+          -- includes a small fix to get the build working. Also updated to include `awaitTxConfirmed`. Also CIP25 metadata fixes.
+        , version = "a8a424b624b64d7fec32b99e55a85d79f5f98a3b"
         }
       }
 in upstream // additions
