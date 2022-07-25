@@ -27,6 +27,11 @@ exports.callMarketPlaceListNft = async (config) => {
   return sb.callMarketPlaceListNft(config)();
 };
 
+exports.callMarketPlaceFetchNft = async (config, args) => {
+  const sb = await seabug;
+  return sb.callMarketPlaceFetchNft(config)(args)();
+};
+
 
 /**
  * Returns a promise containing the connected wallet's balance.

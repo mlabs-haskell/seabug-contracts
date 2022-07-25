@@ -12,7 +12,8 @@
       repo = "cardano-transaction-lib";
       # should be same rev as in packages.dhall
       # Oh update, do `spago2nix generate`
-      rev = "b7614b4e11a57b5b366b65509b86eb4b086bb1ce";
+      # https://github.com/Plutonomicon/cardano-transaction-lib/pull/702/commits/6592f4188850ca4b2adab0c593c6a971087a54ba
+      rev = "6592f4188850ca4b2adab0c593c6a971087a54ba";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };
