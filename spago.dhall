@@ -28,6 +28,7 @@ You can edit this file as you like.
   , "mote"
   , "newtype"
   , "nonempty"
+  , "nullable"
   , "ordered-collections"
   , "parallel"
   , "partial"

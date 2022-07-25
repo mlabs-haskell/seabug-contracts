@@ -13,6 +13,7 @@ import Seabug.CallContract
   ( callMarketPlaceBuy
   , callMarketPlaceBuyTest
   , callMarketPlaceListNft
+  , callMarketPlaceFetchNft
   , callMint
   )
 

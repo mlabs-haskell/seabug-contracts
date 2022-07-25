@@ -1,7 +1,6 @@
 -- | Helper to list the utxo with relevant NFT at the market validator script
 module Seabug.Contract.MarketPlaceListNft
-  ( ListNftResult
-  , marketPlaceListNft
+  ( marketPlaceListNft
   ) where
 
 import Contract.Prelude
@@ -10,10 +9,7 @@ import Contract.Address (getNetworkId, typedValidatorEnterpriseAddress)
 import Contract.Monad (Contract, liftContractE, liftedM)
 import Contract.Numeric.Natural as Natural
 import Contract.PlutusData (fromData, getDatumsByHashes)
-import Contract.Transaction
-  ( TransactionInput
-  , TransactionOutput(TransactionOutput)
-  )
+import Contract.Transaction (TransactionOutput(TransactionOutput))
 import Contract.Utxos (utxosAt)
 import Contract.Value (valueOf)
 import Control.Alternative (guard)
@@ -22,23 +18,18 @@ import Control.Monad.Reader (asks)
 import Control.Parallel (parTraverse)
 import Data.Array (catMaybes, mapMaybe)
 import Data.Map as Map
+import Seabug.Contract.Common (NftResult)
 import Seabug.Contract.Util (minAdaOnlyUTxOValue)
 import Seabug.MarketPlace (marketplaceValidator)
-import Seabug.Metadata (FullSeabugMetadata, getFullSeabugMetadataWithBackoff)
+import Seabug.Metadata (getFullSeabugMetadataWithBackoff)
 import Seabug.Types (MarketplaceDatum(MarketplaceDatum))
-
-type ListNftResult =
-  { input :: TransactionInput
-  , output :: TransactionOutput
-  , metadata :: FullSeabugMetadata
-  }
 
 -- | Lists the utxos at the script address that contain a datum of type
 -- | `MarketplaceDatum` with unit value. It currently doesn't have any logic
 -- | on matching `CurrencySymbol` and `TokenName`.
 marketPlaceListNft
   :: forall (r :: Row Type)
-   . Contract (projectId :: String | r) (Array ListNftResult)
+   . Contract (projectId :: String | r) (Array NftResult)
 marketPlaceListNft = do
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
   networkId <- getNetworkId
