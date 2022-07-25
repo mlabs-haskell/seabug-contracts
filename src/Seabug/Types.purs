@@ -1,27 +1,22 @@
 module Seabug.Types
   ( MarketplaceDatum(..)
+  , LockDatum(..)
   , MintAct(..)
   , MintParams(..)
   , NftCollection(..)
   , NftData(..)
   , NftId(..)
+  , MintCnftParams(..)
   , class Hashable
   , hash
   ) where
 
 import Contract.Prelude
 
-import Cardano.Types.Value as Cardano.Types.Value
-import Contract.Value
-  ( CurrencySymbol
-  , TokenName
-  , getCurrencySymbol
-  , getTokenName
-  , mkCurrencySymbol
-  )
-import Contract.Monad (Contract)
 import Contract.Address (PaymentPubKeyHash, PubKeyHash)
 import Contract.Aeson as Aeson
+import Contract.Monad (Contract)
+import Contract.Numeric.Natural (Natural, toBigInt)
 import Contract.PlutusData
   ( class FromData
   , class ToData
@@ -29,18 +24,35 @@ import Contract.PlutusData
   , fromData
   , toData
   )
-import Contract.Prim.ByteArray
-  ( ByteArray
-  , byteArrayFromIntArrayUnsafe
-  )
-import Contract.Numeric.Natural (Natural, toBigInt)
+import Contract.Prim.ByteArray (ByteArray, byteArrayFromIntArrayUnsafe)
 import Contract.Scripts (ValidatorHash)
 import Contract.Time (Slot)
+import Contract.Value
+  ( CurrencySymbol
+  , TokenName
+  , getCurrencySymbol
+  , getTokenName
+  )
 import Data.Argonaut as Json
 import Data.BigInt (BigInt, fromInt, toInt)
 import Hashing (blake2b256Hash)
 import Partial.Unsafe (unsafePartial)
 import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
+
+newtype MintCnftParams = MintCnftParams
+  { imageUri :: String
+  -- | The token name of the collection nft. Will be base64 encoded
+  , tokenNameString :: String
+  , name :: String
+  , description :: String
+  }
+
+derive instance Generic MintCnftParams _
+derive instance Newtype MintCnftParams _
+derive newtype instance Eq MintCnftParams
+
+instance Show MintCnftParams where
+  show = genericShow
 
 -- Field names have been simplified due to row polymorphism. Please let me know
 -- if the field names must be exact.
@@ -53,8 +65,7 @@ newtype MintParams = MintParams
     price :: Natural
   , lockLockup :: BigInt
   , lockLockupEnd :: Slot
-  , fakeAuthor :: Maybe PaymentPubKeyHash
-  , feeVaultKeys :: Array PubKeyHash -- `List` is also an option
+  , feeVaultKeys :: Array PubKeyHash
   }
 
 derive instance Generic MintParams _
@@ -65,14 +76,13 @@ instance Show MintParams where
   show = genericShow
 
 instance FromData MintParams where
-  fromData (Constr n [ as, ds, pr, ll, lle, fa, fvk ]) | n == zero =
+  fromData (Constr n [ as, ds, pr, ll, lle, fvk ]) | n == zero =
     MintParams <$>
       ( { authorShare: _
         , daoShare: _
         , price: _
         , lockLockup: _
         , lockLockupEnd: _
-        , fakeAuthor: _
         , feeVaultKeys: _
         }
           <$> fromData as
@@ -80,7 +90,6 @@ instance FromData MintParams where
           <*> fromData pr
           <*> fromData ll
           <*> fromData lle
-          <*> fromData fa
           <*> fromData fvk
       )
   fromData _ = Nothing
@@ -93,7 +102,6 @@ instance ToData MintParams where
         , price
         , lockLockup
         , lockLockupEnd
-        , fakeAuthor
         , feeVaultKeys
         }
     ) =
@@ -103,7 +111,6 @@ instance ToData MintParams where
       , toData price
       , toData lockLockup
       , toData lockLockupEnd
-      , toData fakeAuthor
       , toData feeVaultKeys
       ]
 
@@ -161,12 +168,7 @@ instance Aeson.DecodeAeson NftCollection where
       (Left $ Json.TypeMismatch "Expected Json Object")
       ( \o ->
           do
-            collectionNftCs <- do
-              nftCs <- Aeson.getField o "nftCollection'collectionNftCs"
-              note (Json.TypeMismatch "expected currency symbol")
-                $ mkCurrencySymbol
-                $ Cardano.Types.Value.getCurrencySymbol nftCs
-
+            collectionNftCs <- Aeson.getField o "nftCollection'collectionNftCs"
             lockLockupEnd <- Aeson.getField o "nftCollection'lockLockupEnd"
             lockingScript <- Aeson.getField o "nftCollection'lockingScript"
             author <- Aeson.getField o "nftCollection'author"

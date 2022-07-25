@@ -5,11 +5,15 @@ module Seabug.Contract.MarketPlaceBuy
 
 import Contract.Prelude
 
-import Contract.Address
-  ( getNetworkId
-  , ownPaymentPubKeyHash
+import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
+import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
+import Contract.Numeric.Natural (toBigInt)
+import Contract.PlutusData
+  ( Datum(Datum)
+  , Redeemer(Redeemer)
+  , toData
+  , unitRedeemer
   )
-
 import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
 import Contract.ScriptLookups
   ( mintingPolicy
@@ -18,21 +22,7 @@ import Contract.ScriptLookups
   , typedValidatorLookups
   , unspentOutputs
   ) as ScriptLookups
-import Contract.Monad
-  ( Contract
-  , liftContractM
-  , liftContractE
-  , liftedE
-  , liftedM
-  )
-import Contract.Numeric.Natural (toBigInt)
-import Contract.PlutusData
-  ( Datum(Datum)
-  , Redeemer(Redeemer)
-  , toData
-  , unitRedeemer
-  )
-import Contract.Scripts (applyArgs, typedValidatorEnterpriseAddress)
+import Contract.Scripts (typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( TransactionOutput(TransactionOutput)
   , balanceAndSignTxE
@@ -53,18 +43,15 @@ import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
 import Data.String.Common (joinWith)
+import Seabug.Contract.Util (minAdaOnlyUTxOValue, setSeabugMetadata)
 import Seabug.MarketPlace (marketplaceValidator)
-import Seabug.MintingPolicy (mintingPolicy)
-import Seabug.Token (mkTokenName)
+import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
   ( MarketplaceDatum(MarketplaceDatum)
   , MintAct(ChangeOwner)
-  , NftData(NftData)
+  , NftData(..)
   , NftId(NftId)
   )
-
-minAdaOnlyUTxOValue :: BigInt
-minAdaOnlyUTxOValue = fromInt 1_000_000
 
 -- TODO docstring
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
@@ -104,7 +91,6 @@ mkMarketplaceTx (NftData nftData) = do
   let nftCollection = unwrap nftData.nftCollection
   pkh <- liftedM "marketplaceBuy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
-  policy' <- liftedE $ pure mintingPolicy
   log $ "policy args: " <> joinWith "; "
     [ "collectionNftCs: " <> show nftCollection.collectionNftCs
     , "lockingScript: " <> show nftCollection.lockingScript
@@ -113,14 +99,7 @@ mkMarketplaceTx (NftData nftData) = do
     , "daoScript: " <> show nftCollection.daoScript
     , "daoShare: " <> show nftCollection.daoShare
     ]
-  policy <- liftedE $ applyArgs policy'
-    [ toData nftCollection.collectionNftCs
-    , toData nftCollection.lockingScript
-    , toData nftCollection.author
-    , toData nftCollection.authorShare
-    , toData nftCollection.daoScript
-    , toData nftCollection.daoShare
-    ]
+  policy <- liftedE $ mkMintingPolicy $ wrap nftCollection
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
     $ liftAff
@@ -228,4 +207,7 @@ mkMarketplaceTx (NftData nftData) = do
   -- the datums and redeemers will be reattached using a server with redeemers
   -- reindexed also.
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookup constraints
-  pure $ txDatumsRedeemerTxIns /\ curr /\ newName
+  txWithMetadata <-
+    setSeabugMetadata (wrap nftData { nftId = newNft }) curr
+      txDatumsRedeemerTxIns
+  pure $ txWithMetadata /\ curr /\ newName

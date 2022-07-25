@@ -11,9 +11,9 @@
       owner = "Plutonomicon";
       repo = "cardano-transaction-lib";
       # should be same rev as in packages.dhall
-      # Oh update, do `spago2nix generate`
-      # https://github.com/Plutonomicon/cardano-transaction-lib/pull/702/commits/6592f4188850ca4b2adab0c593c6a971087a54ba
-      rev = "6592f4188850ca4b2adab0c593c6a971087a54ba";
+      # To update, do `spago2nix generate`
+      # calum/metadata-invalid-char-fix
+      rev = "32194c502e4a068bf99388b05c708f81612d7541";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };
@@ -24,7 +24,7 @@
       perSystem = nixpkgs.lib.genAttrs defaultSystems;
       nixpkgsFor = system: import nixpkgs {
         inherit system;
-        overlays = [ cardano-transaction-lib.overlay.${system} ];
+        overlays = [ cardano-transaction-lib.overlay ];
       };
       psProjectFor = system:
         let
@@ -43,7 +43,7 @@
         };
     in
     {
-      defaultPackage = perSystem (system: self.packages.${system}.seabug-contracts);
+      defaultPackage = perSystem (system: self.packages.${system}.seabug-contracts-bundle-web);
 
       packages = perSystem (system:
         let

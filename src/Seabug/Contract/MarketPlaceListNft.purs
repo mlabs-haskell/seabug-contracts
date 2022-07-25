@@ -7,6 +7,7 @@ import Contract.Prelude
 
 import Contract.Address (getNetworkId, typedValidatorEnterpriseAddress)
 import Contract.Monad (Contract, liftContractE, liftedM)
+import Contract.Numeric.Natural as Natural
 import Contract.PlutusData (fromData, getDatumsByHashes)
 import Contract.Transaction (TransactionOutput(TransactionOutput))
 import Contract.Utxos (utxosAt)
@@ -18,6 +19,7 @@ import Control.Parallel (parTraverse)
 import Data.Array (catMaybes, mapMaybe)
 import Data.Map as Map
 import Seabug.Contract.Common (NftResult)
+import Seabug.Contract.Util (minAdaOnlyUTxOValue)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.Metadata (getFullSeabugMetadataWithBackoff)
 import Seabug.Types (MarketplaceDatum(MarketplaceDatum))
@@ -52,5 +54,11 @@ marketPlaceListNft = do
         guard $ valueOf out.amount curr name == one
         metadata <- MaybeT $ map hush $
           getFullSeabugMetadataWithBackoff (curr /\ name) projectId
+        -- TODO: this is a temporary solution to only show NFTs known
+        -- to work. This filter catches a couple new nfts whose price
+        -- I put too low. The old nfts are caught above because their
+        -- metadata won't be parsed.
+        guard $ (unwrap metadata.seabugMetadata # _.ownerPrice) >=
+          (Natural.fromBigInt' minAdaOnlyUTxOValue)
         pure { input, output, metadata }
   pure $ catMaybes withMetadata

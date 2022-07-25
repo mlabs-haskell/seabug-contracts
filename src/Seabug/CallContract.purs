@@ -3,11 +3,11 @@ module Seabug.CallContract
   , callMarketPlaceBuyTest
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
+  , callMint
   ) where
 
-import Contract.Prelude
+import Contract.Prelude hiding (null)
 
-import Cardano.Types.Value as Cardano.Types.Value
 import Contract.Address (Slot(Slot))
 import Contract.Monad
   ( ConfigParams(ConfigParams)
@@ -21,6 +21,7 @@ import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
 import Contract.Transaction
   ( TransactionInput(..)
   , TransactionOutput(TransactionOutput)
+  , awaitTxConfirmed
   )
 import Contract.Value
   ( CurrencySymbol
@@ -46,14 +47,18 @@ import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import Partial.Unsafe (unsafePartial)
 import Plutus.Conversion (fromPlutusAddress)
+import Seabug.Contract.CnftMint (mintCnft)
 import Seabug.Contract.Common (NftResult)
 import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
 import Seabug.Contract.MarketPlaceFetchNft (marketPlaceFetchNft)
 import Seabug.Contract.MarketPlaceListNft (marketPlaceListNft)
+import Seabug.Contract.Mint (mintWithCollection)
 import Seabug.Metadata.Share (unShare)
 import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Seabug.Types
-  ( NftCollection(NftCollection)
+  ( MintCnftParams
+  , MintParams
+  , NftCollection(NftCollection)
   , NftData(NftData)
   , NftId(NftId)
   )
@@ -71,6 +76,23 @@ import Wallet (mkNamiWalletAff)
 -- | Exists temporarily for testing purposes
 callMarketPlaceBuyTest :: String -> Effect (Promise String)
 callMarketPlaceBuyTest = Promise.fromAff <<< pure
+
+callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
+callMint cfg args = Promise.fromAff do
+  contractConfig <- buildContractConfig cfg
+  mintCnftParams /\ mintParams <- liftEffect $ liftEither $ buildMintArgs args
+  runContract contractConfig $ do
+    log "Minting cnft..."
+    txHash /\ cnft <- mintCnft mintCnftParams
+    log $ "Waiting for confirmation of cnft transaction: " <> show txHash
+    awaitTxConfirmed txHash
+    log $ "Cnft transaction confirmed: " <> show txHash
+    log $ "Minted cnft: " <> show cnft
+    log "Minting sgNft..."
+    sgNftTxHash <- mintWithCollection cnft mintParams
+    log $ "Waiting for confirmation of nft transaction: " <> show sgNftTxHash
+    awaitTxConfirmed sgNftTxHash
+    log $ "Nft transaction confirmed: " <> show sgNftTxHash
 
 callMarketPlaceFetchNft
   :: ContractConfiguration
@@ -163,6 +185,14 @@ type ListNftResultOut =
       }
   }
 
+type MintArgs =
+  { imageUri :: String
+  , tokenNameString :: String
+  , name :: String
+  , description :: String
+  , price :: BigInt -- Natural
+  }
+
 buildContractConfig
   :: ContractConfiguration -> Aff (ContractConfig (projectId :: String))
 buildContractConfig cfg = do
@@ -243,8 +273,7 @@ buildNftList
   convertSeabugMetaData (SeabugMetadata m) =
     { policyId: scriptHashToBech32Unsafe "policy_vkh" $ unwrap m.policyId -- or the prefix should just be 'script'
     , mintPolicy: byteArrayToHex m.mintPolicy
-    , collectionNftCS: byteArrayToHex $ Cardano.Types.Value.getCurrencySymbol $
-        m.collectionNftCS
+    , collectionNftCS: byteArrayToHex $ getCurrencySymbol m.collectionNftCS
     , collectionNftTN: byteArrayToHex $ getTokenName m.collectionNftTN
     , lockingScript: scriptHashToBech32Unsafe "script" $ unwrap m.lockingScript
     , authorPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap
@@ -313,6 +342,29 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
       , daoScript
       , daoShare
       }
+
+buildMintArgs :: MintArgs -> Either Error (MintCnftParams /\ MintParams)
+buildMintArgs
+  { imageUri
+  , tokenNameString
+  , name
+  , description
+  , price
+  } = do
+  price' <- note (error $ "Invalid price: " <> show price)
+    $ Nat.fromBigInt price
+  let
+    mintCnftParams = wrap { imageUri, tokenNameString, name, description }
+    -- TODO: Put these hard coded params in a better place
+    mintParams = wrap
+      { authorShare: Nat.fromInt' 500
+      , daoShare: Nat.fromInt' 500
+      , price: price'
+      , lockLockup: BigInt.fromInt 5
+      , lockLockupEnd: Slot $ BigNum.fromInt 5
+      , feeVaultKeys: []
+      }
+  pure (mintCnftParams /\ mintParams)
 
 buildTransactionInput :: TransactionInputOut -> Either Error TransactionInput
 buildTransactionInput input = do
