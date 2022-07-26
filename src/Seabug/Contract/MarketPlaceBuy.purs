@@ -1,7 +1,4 @@
-module Seabug.Contract.MarketPlaceBuy
-  ( marketplaceBuy
-  , mkMarketplaceTx
-  ) where
+module Seabug.Contract.MarketPlaceBuy (marketplaceBuy) where
 
 import Contract.Prelude
 
@@ -42,7 +39,6 @@ import Data.Array (find) as Array
 import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
-import Data.String.Common (joinWith)
 import Seabug.Contract.Util (minAdaOnlyUTxOValue, setSeabugMetadata)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
@@ -53,15 +49,11 @@ import Seabug.Types
   , NftId(NftId)
   )
 
--- TODO docstring
+-- | Attempts to submit a transaction where the current user purchases
+-- | the passed NFT.
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
 marketplaceBuy nftData = do
-  unattachedBalancedTx /\ curr /\ newName <- mkMarketplaceTx nftData
-  -- `balanceAndSignTx` does the following:
-  -- 1) Balance a transaction
-  -- 2) Reindex `Spend` redeemers after finalising transaction inputs.
-  -- 3) Attach datums and redeemers to transaction.
-  -- 3) Sign tx, returning the Cbor-hex encoded `ByteArray`.
+  unattachedBalancedTx /\ curr /\ newName <- mkMarketplaceBuyTx nftData
   signedTx <- liftedE
     ( lmap
         ( \e ->
@@ -70,7 +62,6 @@ marketplaceBuy nftData = do
         )
         <$> balanceAndSignTxE unattachedBalancedTx
     )
-  -- Submit transaction using Cbor-hex encoded `ByteArray`
   transactionHash <- submit signedTx
   log $ "marketplaceBuy: Transaction successfully submitted with hash: "
     <> show transactionHash
@@ -78,37 +69,21 @@ marketplaceBuy nftData = do
 
 -- https://github.com/mlabs-haskell/plutus-use-cases/blob/927eade6aa9ad37bf2e9acaf8a14ae2fc304b5ba/mlabs/src/Mlabs/EfficientNFT/Contract/MarketplaceBuy.hs
 -- rev: 2c9ce295ccef4af3f3cb785982dfe554f8781541
--- The `MintingPolicy` may be decoded as Json, although I'm not sure as we don't
--- have `mkMintingPolicyScript`. Otherwise, it's an policy that hasn't been
--- applied to arguments. See `Seabug.Token.policy`
--- TODO docstring
-mkMarketplaceTx
+mkMarketplaceBuyTx
   :: forall (r :: Row Type)
    . NftData
   -> Contract r
        (UnattachedUnbalancedTx /\ Value.CurrencySymbol /\ Value.TokenName)
-mkMarketplaceTx (NftData nftData) = do
+mkMarketplaceBuyTx (NftData nftData) = do
   let nftCollection = unwrap nftData.nftCollection
   pkh <- liftedM "marketplaceBuy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
-  log $ "policy args: " <> joinWith "; "
-    [ "collectionNftCs: " <> show nftCollection.collectionNftCs
-    , "lockingScript: " <> show nftCollection.lockingScript
-    , "author: " <> show nftCollection.author
-    , "authorShare: " <> show nftCollection.authorShare
-    , "daoScript: " <> show nftCollection.daoScript
-    , "daoShare: " <> show nftCollection.daoShare
-    ]
   policy <- liftedE $ mkMintingPolicy $ wrap nftCollection
 
   curr <- liftedM "marketplaceBuy: Cannot get CurrencySymbol"
     $ liftAff
     $ Value.scriptCurrencySymbol policy
-  -- curr <- liftContractM "marketplaceBuy: Cannot get CurrencySymbol"
-  --   $ mkCurrencySymbol
-  --   $ Value.getCurrencySymbol currSym
 
-  -- Read in the typed validator:
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
   networkId <- getNetworkId
   let
@@ -122,9 +97,6 @@ mkMarketplaceTx (NftData nftData) = do
   oldName <- liftedM "marketplaceBuy: Cannot hash old token" $ mkTokenName nft
   newName <- liftedM "marketplaceBuy: Cannot hash new token"
     $ mkTokenName newNft
-  log $ "curr: " <> show curr
-  log $ "oldName: " <> show oldName
-  log $ "newName: " <> show newName
   let
     oldNftValue = Value.singleton curr oldName $ negate one
     newNftValue = Value.singleton curr newName one
@@ -164,7 +136,6 @@ mkMarketplaceTx (NftData nftData) = do
     liftedM "marketplaceBuy: Cannot get user Utxos" $ utxosAt userAddr
   scriptUtxos <-
     liftedM "marketplaceBuy: Cannot get script Utxos" $ utxosAt scriptAddr
-  log $ "scriptUtxos: " <> show scriptUtxos
   utxo /\ utxoIndex <-
     liftContractM "marketplaceBuy: NFT not found on marketplace"
       $ Array.find containsNft
@@ -201,10 +172,6 @@ mkMarketplaceTx (NftData nftData) = do
               ( newNftValue <> minAdaVal
               )
           ]
-  log $ "utxosTx: " <> show utxosForTx
-  -- Created unbalanced tx which stripped datums and redeemers with tx inputs,
-  -- the datums and redeemers will be reattached using a server with redeemers
-  -- reindexed also.
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookup constraints
   txWithMetadata <-
     setSeabugMetadata (wrap nftData { nftId = newNft }) curr

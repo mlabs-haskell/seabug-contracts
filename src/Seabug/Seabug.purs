@@ -11,7 +11,6 @@ import Data.BigInt as BigInt
 import QueryM.Utxos (getWalletBalance)
 import Seabug.CallContract
   ( callMarketPlaceBuy
-  , callMarketPlaceBuyTest
   , callMarketPlaceListNft
   , callMarketPlaceFetchNft
   , callMint

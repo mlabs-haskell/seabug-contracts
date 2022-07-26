@@ -39,7 +39,8 @@ import Seabug.Types
   )
 import Types.BigNum as BigNum
 
--- | TODO: Is slot 0 for TipAtGenesis okay?
+-- | TODO: Use `currentSlot` instead, see
+-- | https://github.com/mlabs-haskell/seabug-contracts/issues/27
 slotFromTip :: Tip -> Slot
 slotFromTip TipAtGenesis = wrap $ BigNum.zero
 slotFromTip (Tip (ChainTip { slot })) = slot

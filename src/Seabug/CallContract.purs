@@ -1,6 +1,5 @@
 module Seabug.CallContract
   ( callMarketPlaceBuy
-  , callMarketPlaceBuyTest
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
   , callMint
@@ -73,10 +72,6 @@ import Types.BigNum as BigNum
 import Types.Natural as Nat
 import Wallet (mkNamiWalletAff)
 
--- | Exists temporarily for testing purposes
-callMarketPlaceBuyTest :: String -> Effect (Promise String)
-callMarketPlaceBuyTest = Promise.fromAff <<< pure
-
 callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
@@ -107,7 +102,7 @@ callMarketPlaceFetchNft cfg args = Promise.fromAff do
       buildNftList (unwrap contractConfig).networkId nftResult
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
---   Returns a JS promise holding no data.
+-- | Returns a JS promise holding no data.
 callMarketPlaceBuy
   :: ContractConfiguration -> BuyNftArgs -> Effect (Promise Unit)
 callMarketPlaceBuy cfg args = Promise.fromAff do
@@ -116,7 +111,7 @@ callMarketPlaceBuy cfg args = Promise.fromAff do
   runContract_ contractConfig (marketplaceBuy nftData)
 
 -- | Calls Seabugs marketPlaceListNft and takes care of converting data types.
---   Returns a JS promise holding nft listings.
+-- | Returns a JS promise holding nft listings.
 callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
@@ -160,7 +155,6 @@ type BuyNftArgs =
 
 type TransactionInputOut = { transactionId :: String, inputIndex :: Int }
 
--- Placeholder for types I'm not sure how should we represent on frontend.
 type ValueOut = Array
   { currencySymbol :: String, tokenName :: String, amount :: BigInt }
 
@@ -177,7 +171,7 @@ type ListNftResultOut =
           , authorPkh :: String -- PubKeyHash
           , authorShare :: BigInt -- Share
           , marketplaceScript :: String -- ValidatorHash
-          , marketplaceShare :: BigInt -- share
+          , marketplaceShare :: BigInt -- Share
           , ownerPkh :: String -- PubKeyHash
           , ownerPrice :: BigInt --Natural
           }
@@ -355,7 +349,8 @@ buildMintArgs
     $ Nat.fromBigInt price
   let
     mintCnftParams = wrap { imageUri, tokenNameString, name, description }
-    -- TODO: Put these hard coded params in a better place
+    -- TODO: Put these hard coded params in a better place, see
+    -- https://github.com/mlabs-haskell/seabug-contracts/issues/25
     mintParams = wrap
       { authorShare: Nat.fromInt' 500
       , daoShare: Nat.fromInt' 500

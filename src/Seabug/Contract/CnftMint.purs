@@ -48,7 +48,8 @@ mintCnft (MintCnftParams params) = do
   policy <- liftedE $ mkCnftMintingPolicy oref
   curr <- liftedM "Could not get currency symbol" $ liftAff $
     scriptCurrencySymbol policy
-  -- TODO: figure out how to encode the token name (base64 maybe)
+  -- TODO: figure out how to encode the token name (base64 maybe), see
+  -- https://github.com/mlabs-haskell/seabug-contracts/issues/26
   tn <- liftContractM "Invalid token name"
     $ mkTokenName
     =<< hexToByteArray params.tokenNameString

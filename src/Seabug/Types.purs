@@ -41,7 +41,7 @@ import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
 
 newtype MintCnftParams = MintCnftParams
   { imageUri :: String
-  -- | The token name of the collection nft. Will be base64 encoded
+  -- | The token name of the collection nft
   , tokenNameString :: String
   , name :: String
   , description :: String
@@ -54,12 +54,9 @@ derive newtype instance Eq MintCnftParams
 instance Show MintCnftParams where
   show = genericShow
 
--- Field names have been simplified due to row polymorphism. Please let me know
--- if the field names must be exact.
 -- | Parameters that need to be submitted when minting a new NFT.
 newtype MintParams = MintParams
-  { -- | Shares retained by author.
-    authorShare :: Natural
+  { authorShare :: Natural
   , daoShare :: Natural
   , -- | Listing price of the NFT, in Lovelace.
     price :: Natural
@@ -142,8 +139,6 @@ instance ToData NftId where
   toData (NftId { collectionNftTn, price, owner }) =
     Constr zero [ toData collectionNftTn, toData price, toData owner ]
 
--- Field names have been simplified due to row polymorphism. Please let me know
--- if the field names must be exact.
 newtype NftCollection = NftCollection
   { collectionNftCs :: CurrencySymbol
   , lockLockup :: BigInt
@@ -160,8 +155,6 @@ derive instance Newtype NftCollection _
 derive newtype instance Eq NftCollection
 derive newtype instance Ord NftCollection
 
--- Note the renaming of fields from their Plutus equivalents, e.g.
--- "nftCollection'collectionNftCs" to "collectionNftCs".
 instance Aeson.DecodeAeson NftCollection where
   decodeAeson j =
     Aeson.caseAesonObject

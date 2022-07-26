@@ -78,7 +78,7 @@ getFullSeabugMetadataWithBackoff asset projectId = go 1.0
             -- on my testing
             delay <<< wrap <<< (_ * 1000.0) =<<
               (liftEffect $ randomRange 1.0 (3.0 * n'))
-            log $ "Retrying, attempt " <> show n'
+            log $ "Retrying metadata query, attempt #" <> show n'
             go n'
       _ -> pure r
 
@@ -187,12 +187,8 @@ mkGetRequest path = do
           [ Affjax.RequestHeader.RequestHeader "project_id" projectId
           ]
       }
-  res <- ExceptT $ liftAff $ do
-    r <- Affjax.request req <#> lmap (BlockfrostOtherError <<< printError)
-    case r of
-      Left e -> log $ show e
-      Right _ -> pure unit
-    pure r
+  res <- ExceptT $ liftAff $ Affjax.request req
+    <#> lmap (BlockfrostOtherError <<< printError)
   when (unwrap res.status == 429) $ throwError $ BlockfrostRateLimit
   except $
     lmap (BlockfrostOtherError <<< (("Error parsing JSON: " <> _) <<< show))
