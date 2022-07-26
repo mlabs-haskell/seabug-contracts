@@ -41,6 +41,7 @@ import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
 import Seabug.Contract.Util (minAdaOnlyUTxOValue, setSeabugMetadata)
 import Seabug.MarketPlace (marketplaceValidator)
+import Seabug.Metadata.Share (maxShare)
 import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
   ( MarketplaceDatum(MarketplaceDatum)
@@ -109,7 +110,7 @@ mkMarketplaceBuyTx (NftData nftData) = do
       Value.valueOf out.amount curr oldName == one
 
     getShare :: BigInt -> BigInt
-    getShare share = (toBigInt nftPrice * share) `div` fromInt 10_000
+    getShare share = (toBigInt nftPrice * share) `div` fromInt maxShare
 
     shareToSubtract :: BigInt -> BigInt
     shareToSubtract v

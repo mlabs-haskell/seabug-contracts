@@ -1,5 +1,6 @@
 module Seabug.Metadata.Share
   ( Share
+  , maxShare
   , mkShare
   , unShare
   ) where
@@ -43,9 +44,12 @@ instance Show Share where
 
 derive instance Eq Share
 
+maxShare :: Int
+maxShare = 10_000
+
 mkShare :: Int -> Maybe Share
 mkShare n
-  | n >= 0 && n <= 10000 = Just $ Share $ BigInt.fromInt n
+  | n >= 0 && n <= maxShare = Just $ Share $ BigInt.fromInt n
   | otherwise = Nothing
 
 unShare :: Share -> BigInt
