@@ -116,8 +116,7 @@ mkMarketplaceTx (NftData nftData) = do
     nft' = unwrap nft
     newNft = NftId nft' { owner = pkh }
   scriptAddr <-
-    liftedM "marketplaceBuy: Cannot convert validator hash to address"
-      $ pure
+    liftContractM "marketplaceBuy: Cannot convert validator hash to address"
       $ typedValidatorEnterpriseAddress networkId
       $ wrap marketplaceValidator'
   oldName <- liftedM "marketplaceBuy: Cannot hash old token" $ mkTokenName nft
