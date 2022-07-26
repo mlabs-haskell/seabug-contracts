@@ -17,7 +17,10 @@ import Types.Int (toBigInt) as Int
 import Types.PlutusData (PlutusData(Integer))
 import Types.TransactionMetadata (TransactionMetadatum(Int)) as Metadata
 
--- | A number between 0 and 10000 (inclusive) representing percentage of the price.
+-- | A number between 0 and 10000 (inclusive) representing percentage
+-- | of the price. Note that this differs from Maks' original
+-- | self-governed NFTs paper, which specifies the range [0, 1000]
+-- | instead.
 newtype Share = Share BigInt
 
 derive newtype instance ToData Share
