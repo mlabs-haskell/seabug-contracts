@@ -10,7 +10,6 @@ import Contract.Monad (Contract, liftContractM)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.ScriptLookups (UnattachedUnbalancedTx)
 import Contract.Value (CurrencySymbol)
-import Contract.Value as Value
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Seabug.Metadata.Share (mkShare)
@@ -34,11 +33,10 @@ setSeabugMetadata (NftData nftData) sgNftCurr tx = do
     natToShare nat = liftContractM "Invalid share"
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
-    policyId = Value.currencyMPSHash sgNftCurr
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
   setTxMetadata tx $ SeabugMetadata
-    { policyId
+    { policyId: sgNftCurr
     , mintPolicy: mempty
     , collectionNftCS: nftCollection.collectionNftCs
     , lockingScript: nftCollection.lockingScript

@@ -26,6 +26,7 @@ import Contract.Value
   ( CurrencySymbol
   , TokenName
   , Value
+  , currencyMPSHash
   , flattenNonAdaAssets
   , getCurrencySymbol
   , getTokenName
@@ -265,7 +266,8 @@ buildNftList
 
   convertSeabugMetaData :: SeabugMetadata -> _
   convertSeabugMetaData (SeabugMetadata m) =
-    { policyId: scriptHashToBech32Unsafe "policy_vkh" $ unwrap m.policyId -- or the prefix should just be 'script'
+    { policyId: scriptHashToBech32Unsafe "policy_vkh" $ unwrap $
+        currencyMPSHash m.policyId -- or the prefix should just be 'script'
     , mintPolicy: m.mintPolicy
     , collectionNftCS: byteArrayToHex $ getCurrencySymbol m.collectionNftCS
     , collectionNftTN: byteArrayToHex $ getTokenName m.collectionNftTN

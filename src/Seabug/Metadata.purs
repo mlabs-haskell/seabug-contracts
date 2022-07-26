@@ -13,7 +13,7 @@ import Affjax (printError)
 import Affjax as Affjax
 import Affjax.RequestHeader as Affjax.RequestHeader
 import Affjax.ResponseFormat as Affjax.ResponseFormat
-import Contract.Prim.ByteArray (ByteArray, byteArrayToHex)
+import Contract.Prim.ByteArray (byteArrayToHex)
 import Contract.Value
   ( CurrencySymbol
   , TokenName
@@ -34,7 +34,11 @@ import Data.HTTP.Method (Method(GET))
 import Data.Newtype (unwrap)
 import Effect.Aff (delay)
 import Effect.Random (randomRange)
-import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
+import Seabug.Metadata.Types
+  ( SeabugMetadata(SeabugMetadata)
+  , decodeSeabugMetadataAeson
+  , metadataBytesString
+  )
 
 type Hash = String
 
@@ -93,11 +97,6 @@ getFullSeabugMetadata a@(currSym /\ _) projectId =
     ipfsHash <- getIpfsHash seabugMetadata
     pure { seabugMetadata, ipfsHash }
 
--- | Convert a byte array into a string as represented in the metadata
--- | json, i.e. hex encoded with "0x" prepended.
-metadataBytesString :: ByteArray -> String
-metadataBytesString = ("0x" <> _) <<< byteArrayToHex
-
 getIpfsHash
   :: SeabugMetadata
   -> BlockfrostFetch Hash
@@ -137,12 +136,8 @@ getMintingTxSeabugMetadata currSym txHash = do
   findSeabugMetadata = findMap $ Aeson.caseAesonObject Nothing $ \o -> do
     label <- hush $ Aeson.getField o "label"
     guard $ label == "727"
-    hush $ do
-      md <- Aeson.getField o "json_metadata"
-      Aeson.decodeAeson =<< Aeson.getField md currSymKey
-
-  currSymKey :: String
-  currSymKey = metadataBytesString $ getCurrencySymbol currSym
+    hush $ decodeSeabugMetadataAeson currSym
+      =<< Aeson.getField o "json_metadata"
 
 getMintingTxHash
   :: forall (r :: Row Type)

@@ -1,17 +1,20 @@
 module Seabug.Metadata.Types
-  ( SeabugMetadata(SeabugMetadata)
-  , SeabugMetadataDelta(SeabugMetadataDelta)
+  ( SeabugMetadata(..)
+  , SeabugMetadataDelta(..)
+  , decodeSeabugMetadataAeson
+  , metadataBytesString
   ) where
 
 import Contract.Prelude
 
-import Aeson (class DecodeAeson, JsonDecodeError(..), caseAesonObject, getField)
-import Contract.Value (CurrencySymbol, mkCurrencySymbol)
+import Aeson (Aeson, JsonDecodeError(..), caseAesonObject, getField, (.:))
+import Contract.Prim.ByteArray (ByteArray, byteArrayToHex)
+import Contract.Value (CurrencySymbol, getCurrencySymbol, mkCurrencySymbol)
 import Data.BigInt (fromInt) as BigInt
 import Data.Either (Either(Left), note)
 import Data.Generic.Rep (class Generic)
 import Data.Map (toUnfoldable) as Map
-import Data.Maybe (Maybe(Nothing), fromJust)
+import Data.Maybe (Maybe(Nothing))
 import Data.Newtype (class Newtype, wrap)
 import Data.Show.Generic (genericShow)
 import Data.String (Pattern(..), stripPrefix)
@@ -32,17 +35,16 @@ import Serialization.Hash
   )
 import ToData (class ToData, toData)
 import Type.Proxy (Proxy(Proxy))
-import Types.ByteArray (ByteArray, hexToByteArray)
 import Types.Natural (Natural)
 import Types.PlutusData (PlutusData(Map))
 import Types.PubKeyHash (PubKeyHash)
-import Types.RawBytes (RawBytes, hexToRawBytes, hexToRawBytesUnsafe)
-import Types.Scripts (MintingPolicyHash, ValidatorHash)
+import Types.RawBytes (RawBytes, hexToRawBytes)
+import Types.Scripts (ValidatorHash)
 import Types.TokenName (TokenName, mkTokenName)
 import Types.TransactionMetadata (TransactionMetadatum(MetadataMap))
 
 newtype SeabugMetadata = SeabugMetadata
-  { policyId :: MintingPolicyHash
+  { policyId :: CurrencySymbol
   , mintPolicy :: String
   , collectionNftCS :: CurrencySymbol
   , collectionNftTN :: TokenName
@@ -170,83 +172,90 @@ instance FromData SeabugMetadata where
       , ownerPrice
       }
 
-instance DecodeAeson SeabugMetadata where
-  decodeAeson =
-    caseAesonObject
-      (Left (TypeMismatch "Expected object"))
-      $ \o -> do
-          collectionNftCS <-
-            ( note (TypeMismatch "Invalid CurrencySymbol")
-                <<< mkCurrencySymbol
-                <<< unwrap
-                <=< decodeMetadataBytes
-            )
-              =<< getField o "collectionNftCS"
-          collectionNftTN <-
-            ( note (TypeMismatch "expected ASCII-encoded `TokenName`")
-                <<< mkTokenName
-                <<< unwrap
-                <=< decodeMetadataBytes
-            )
-              =<< getField o "collectionNftTN"
-          lockingScript <-
-            map wrap
-              <<< decodeScriptHash
-              =<< getField o "lockingScript"
-          authorPkh <- decodePkh =<< getField o "authorPkh"
-          authorShare <- decodeShare =<< getField o "authorShare"
-          marketplaceScript <- map wrap <<< decodeScriptHash
-            =<< getField o "marketplaceScript"
-          marketplaceShare <- decodeShare =<< getField o "marketplaceShare"
-          ownerPkh <- decodePkh =<< getField o "ownerPkh"
-          ownerPrice <- getField o "ownerPrice"
-          mintPolicy <- getField o "mintPolicy"
-          pure $ SeabugMetadata
-            { -- Not used in the endpoints where we parse the metadata, so we
-              -- can set a dummy value
-              policyId: wrap
-                $ unsafePartial
-                $ fromJust
-                $ scriptHashFromBytes
-                $ hexToRawBytesUnsafe
-                    "00000000000000000000000000000000000000000000000000000000"
-            , mintPolicy
-            , collectionNftCS
-            , collectionNftTN
-            , lockingScript
-            , authorPkh
-            , authorShare
-            , marketplaceScript
-            , marketplaceShare
-            , ownerPkh
-            , ownerPrice
-            }
-    where
-    decodePkh :: String -> Either JsonDecodeError PubKeyHash
-    decodePkh =
+-- | Convert a byte array into a string as represented in the metadata
+-- | json, i.e. hex encoded with "0x" prepended.
+metadataBytesString :: ByteArray -> String
+metadataBytesString = ("0x" <> _) <<< byteArrayToHex
+
+-- | Attempt to decode seabug metadata at the key specified by the
+-- | passed in `CurrencySymbol` (the `policyId`)
+decodeSeabugMetadataAeson
+  :: CurrencySymbol -> Aeson -> Either JsonDecodeError SeabugMetadata
+decodeSeabugMetadataAeson policyId =
+  caseAesonObject (Left (TypeMismatch "Expected object"))
+    $ (_ .: policyIdField)
+    >=> caseAesonObject (Left (TypeMismatch "Expected object")) parseMd
+  where
+  policyIdField = metadataBytesString $ getCurrencySymbol policyId
+
+  parseMd o = do
+    collectionNftCS <-
+      ( note (TypeMismatch "Invalid CurrencySymbol")
+          <<< mkCurrencySymbol
+          <<< unwrap
+          <=< decodeMetadataBytes
+      )
+        =<< getField o "collectionNftCS"
+    collectionNftTN <-
+      ( note (TypeMismatch "expected ASCII-encoded `TokenName`")
+          <<< mkTokenName
+          <<< unwrap
+          <=< decodeMetadataBytes
+      )
+        =<< getField o "collectionNftTN"
+    lockingScript <-
       map wrap
-        <<< note (TypeMismatch "Invalid Ed25519KeyHash")
-        <<< ed25519KeyHashFromBytes
-        <=< decodeMetadataBytes
+        <<< decodeScriptHash
+        =<< getField o "lockingScript"
+    authorPkh <- decodePkh =<< getField o "authorPkh"
+    authorShare <- decodeShare =<< getField o "authorShare"
+    marketplaceScript <- map wrap <<< decodeScriptHash
+      =<< getField o "marketplaceScript"
+    marketplaceShare <- decodeShare =<< getField o "marketplaceShare"
+    ownerPkh <- decodePkh =<< getField o "ownerPkh"
+    ownerPrice <- getField o "ownerPrice"
+    mintPolicy <- getField o "mintPolicy"
+    pure $ SeabugMetadata
+      { -- Not used in the endpoints where we parse the metadata, so we
+        -- can set a dummy value
+        policyId
+      , mintPolicy
+      , collectionNftCS
+      , collectionNftTN
+      , lockingScript
+      , authorPkh
+      , authorShare
+      , marketplaceScript
+      , marketplaceShare
+      , ownerPkh
+      , ownerPrice
+      }
 
-    decodeShare :: Int -> Either JsonDecodeError Share
-    decodeShare = note (TypeMismatch "Expected int between 0 and 10000")
-      <<< mkShare
+  decodePkh :: String -> Either JsonDecodeError PubKeyHash
+  decodePkh =
+    map wrap
+      <<< note (TypeMismatch "Invalid Ed25519KeyHash")
+      <<< ed25519KeyHashFromBytes
+      <=< decodeMetadataBytes
 
-    decodeScriptHash :: String -> Either JsonDecodeError ScriptHash
-    decodeScriptHash =
-      note (TypeMismatch "Expected hex-encoded script hash")
-        <<< scriptHashFromBytes
-        <=< decodeMetadataBytes
+  decodeShare :: Int -> Either JsonDecodeError Share
+  decodeShare = note (TypeMismatch "Expected int between 0 and 10000")
+    <<< mkShare
 
-    decodeMetadataBytes :: String -> Either JsonDecodeError RawBytes
-    decodeMetadataBytes =
-      note (TypeMismatch "Invalid hex string in bytes field") <<< hexToRawBytes
-        <=< note (TypeMismatch "Expected 0x prefix in bytes field")
-        <<< stripPrefix (Pattern "0x")
+  decodeScriptHash :: String -> Either JsonDecodeError ScriptHash
+  decodeScriptHash =
+    note (TypeMismatch "Expected hex-encoded script hash")
+      <<< scriptHashFromBytes
+      <=< decodeMetadataBytes
+
+  decodeMetadataBytes :: String -> Either JsonDecodeError RawBytes
+  decodeMetadataBytes =
+    note (TypeMismatch "Invalid hex string in bytes field") <<< hexToRawBytes
+      <=< note (TypeMismatch "Expected 0x prefix in bytes field")
+      <<< stripPrefix (Pattern "0x")
 
 newtype SeabugMetadataDelta = SeabugMetadataDelta
-  { policyId :: MintingPolicyHash
+  { policyId :: CurrencySymbol
   , ownerPkh :: PubKeyHash
   , ownerPrice :: Natural
   }

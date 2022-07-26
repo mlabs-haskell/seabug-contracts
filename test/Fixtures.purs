@@ -20,8 +20,14 @@ import Contract.Address (Ed25519KeyHash, PubKeyHash(..))
 import Contract.Numeric.Natural as Natural
 import Contract.Prelude (fromJust)
 import Contract.Prim.ByteArray (hexToByteArrayUnsafe)
-import Contract.Scripts (MintingPolicyHash(..), ScriptHash, ValidatorHash(..))
-import Contract.Value (CurrencySymbol, mkCurrencySymbol, TokenName, mkTokenName)
+import Contract.Scripts (ScriptHash, ValidatorHash(..))
+import Contract.Value
+  ( CurrencySymbol
+  , TokenName
+  , mkCurrencySymbol
+  , mkTokenName
+  , scriptHashAsCurrencySymbol
+  )
 import Data.BigInt as BigInt
 import Partial.Unsafe (unsafePartial)
 import Seabug.Metadata.Share (Share, mkShare)
@@ -64,8 +70,8 @@ scriptHash2 = unsafePartial $ fromJust $ scriptHashFromBytes $
   hexToRawBytesUnsafe
     "00000000005bb21ce6d8c7502aca70b9316d10e958611f3c6b758f60"
 
-policyId :: MintingPolicyHash
-policyId = MintingPolicyHash scriptHash1
+policyId :: CurrencySymbol
+policyId = scriptHashAsCurrencySymbol scriptHash1
 
 validatorHashFixture1 :: ValidatorHash
 validatorHashFixture1 = ValidatorHash scriptHash1
