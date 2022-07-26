@@ -43,7 +43,7 @@ import Types.TransactionMetadata (TransactionMetadatum(MetadataMap))
 
 newtype SeabugMetadata = SeabugMetadata
   { policyId :: MintingPolicyHash
-  , mintPolicy :: ByteArray
+  , mintPolicy :: String
   , collectionNftCS :: CurrencySymbol
   , collectionNftTN :: TokenName
   , lockingScript :: ValidatorHash
@@ -200,6 +200,7 @@ instance DecodeAeson SeabugMetadata where
           marketplaceShare <- decodeShare =<< getField o "marketplaceShare"
           ownerPkh <- decodePkh =<< getField o "ownerPkh"
           ownerPrice <- getField o "ownerPrice"
+          mintPolicy <- getField o "mintPolicy"
           pure $ SeabugMetadata
             { -- Not used in the endpoints where we parse the metadata, so we
               -- can set a dummy value
@@ -209,7 +210,7 @@ instance DecodeAeson SeabugMetadata where
                 $ scriptHashFromBytes
                 $ hexToRawBytesUnsafe
                     "00000000000000000000000000000000000000000000000000000000"
-            , mintPolicy: mempty
+            , mintPolicy
             , collectionNftCS
             , collectionNftTN
             , lockingScript

@@ -272,7 +272,7 @@ buildNftList
   convertSeabugMetaData :: SeabugMetadata -> _
   convertSeabugMetaData (SeabugMetadata m) =
     { policyId: scriptHashToBech32Unsafe "policy_vkh" $ unwrap m.policyId -- or the prefix should just be 'script'
-    , mintPolicy: byteArrayToHex m.mintPolicy
+    , mintPolicy: m.mintPolicy
     , collectionNftCS: byteArrayToHex $ getCurrencySymbol m.collectionNftCS
     , collectionNftTN: byteArrayToHex $ getTokenName m.collectionNftTN
     , lockingScript: scriptHashToBech32Unsafe "script" $ unwrap m.lockingScript

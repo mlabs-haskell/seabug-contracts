@@ -79,7 +79,7 @@ shareFixture = unsafePartial $ fromJust $ mkShare 100
 seabugMetadataFixture1 :: SeabugMetadata
 seabugMetadataFixture1 = SeabugMetadata
   { policyId: policyId
-  , mintPolicy: hexToByteArrayUnsafe "00000000"
+  , mintPolicy: "00000000"
   , collectionNftCS: currencySymbol1
   , collectionNftTN: tokenName1
   , lockingScript: validatorHashFixture1
