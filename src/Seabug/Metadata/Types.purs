@@ -3,7 +3,7 @@ module Seabug.Metadata.Types
   , SeabugMetadataDelta(SeabugMetadataDelta)
   ) where
 
-import Prelude
+import Contract.Prelude
 
 import Aeson (class DecodeAeson, JsonDecodeError(..), caseAesonObject, getField)
 import Contract.Value (CurrencySymbol, mkCurrencySymbol)
@@ -36,7 +36,7 @@ import Types.ByteArray (ByteArray, hexToByteArray)
 import Types.Natural (Natural)
 import Types.PlutusData (PlutusData(Map))
 import Types.PubKeyHash (PubKeyHash)
-import Types.RawBytes (hexToRawBytes, hexToRawBytesUnsafe)
+import Types.RawBytes (RawBytes, hexToRawBytes, hexToRawBytesUnsafe)
 import Types.Scripts (MintingPolicyHash, ValidatorHash)
 import Types.TokenName (TokenName, mkTokenName)
 import Types.TransactionMetadata (TransactionMetadatum(MetadataMap))
@@ -176,19 +176,23 @@ instance DecodeAeson SeabugMetadata where
       (Left (TypeMismatch "Expected object"))
       $ \o -> do
           collectionNftCS <-
-            note (TypeMismatch "Invalid ByteArray")
-              <<<
-                ( mkCurrencySymbol <=< hexToByteArray <=<
-                    removeMetadataBytesPrefix
-                )
+            ( note (TypeMismatch "Invalid CurrencySymbol")
+                <<< mkCurrencySymbol
+                <<< unwrap
+                <=< decodeMetadataBytes
+            )
               =<< getField o "collectionNftCS"
           collectionNftTN <-
-            note (TypeMismatch "expected ASCII-encoded `TokenName`")
-              <<< (mkTokenName <=< hexToByteArray <=< removeMetadataBytesPrefix)
+            ( note (TypeMismatch "expected ASCII-encoded `TokenName`")
+                <<< mkTokenName
+                <<< unwrap
+                <=< decodeMetadataBytes
+            )
               =<< getField o "collectionNftTN"
           lockingScript <-
             map wrap
-              <<< decodeScriptHash =<< getField o "lockingScript"
+              <<< decodeScriptHash
+              =<< getField o "lockingScript"
           authorPkh <- decodePkh =<< getField o "authorPkh"
           authorShare <- decodeShare =<< getField o "authorShare"
           marketplaceScript <- map wrap <<< decodeScriptHash
@@ -219,13 +223,10 @@ instance DecodeAeson SeabugMetadata where
     where
     decodePkh :: String -> Either JsonDecodeError PubKeyHash
     decodePkh =
-      map wrap <<<
-        ( note (TypeMismatch "Invalid Ed25519KeyHash") <<<
-            ed25519KeyHashFromBytes
-            <=< note (TypeMismatch "Invalid ByteArray") <<<
-              hexToRawBytes
-        ) <=< note (TypeMismatch "Expected 0x prefix in authorPkh")
-        <<< removeMetadataBytesPrefix
+      map wrap
+        <<< note (TypeMismatch "Invalid Ed25519KeyHash")
+        <<< ed25519KeyHashFromBytes
+        <=< decodeMetadataBytes
 
     decodeShare :: Int -> Either JsonDecodeError Share
     decodeShare = note (TypeMismatch "Expected int between 0 and 10000")
@@ -233,15 +234,15 @@ instance DecodeAeson SeabugMetadata where
 
     decodeScriptHash :: String -> Either JsonDecodeError ScriptHash
     decodeScriptHash =
-      note
-        (TypeMismatch "Expected hex-encoded script hash")
-        <<<
-          ( scriptHashFromBytes <<< wrap <=< hexToByteArray <=<
-              removeMetadataBytesPrefix
-          )
+      note (TypeMismatch "Expected hex-encoded script hash")
+        <<< scriptHashFromBytes
+        <=< decodeMetadataBytes
 
-    removeMetadataBytesPrefix :: String -> Maybe String
-    removeMetadataBytesPrefix = stripPrefix (Pattern "0x")
+    decodeMetadataBytes :: String -> Either JsonDecodeError RawBytes
+    decodeMetadataBytes =
+      note (TypeMismatch "Invalid hex string in bytes field") <<< hexToRawBytes
+        <=< note (TypeMismatch "Expected 0x prefix in bytes field")
+        <<< stripPrefix (Pattern "0x")
 
 newtype SeabugMetadataDelta = SeabugMetadataDelta
   { policyId :: MintingPolicyHash
