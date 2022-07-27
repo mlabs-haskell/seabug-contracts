@@ -37,7 +37,7 @@ setSeabugMetadata (NftData nftData) sgNftCurr tx = do
   marketplaceShareValidated <- natToShare nftCollection.daoShare
   setTxMetadata tx $ SeabugMetadata
     { policyId: sgNftCurr
-    , mintPolicy: mempty
+    , mintPolicy: "V1"
     , collectionNftCS: nftCollection.collectionNftCs
     , lockingScript: nftCollection.lockingScript
     , collectionNftTN: nftId.collectionNftTn
