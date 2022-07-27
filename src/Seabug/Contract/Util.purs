@@ -17,7 +17,7 @@ import Seabug.Metadata.Types (SeabugMetadata(..))
 import Seabug.Types (NftData(..))
 
 minAdaOnlyUTxOValue :: BigInt
-minAdaOnlyUTxOValue = BigInt.fromInt 1_000_000
+minAdaOnlyUTxOValue = BigInt.fromInt 2_000_000
 
 -- | Set metadata on the transaction for the given NFT
 setSeabugMetadata

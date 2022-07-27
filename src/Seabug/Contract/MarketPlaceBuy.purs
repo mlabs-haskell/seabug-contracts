@@ -152,8 +152,6 @@ mkMarketplaceBuyTx (NftData nftData) = do
       , ScriptLookups.ownPaymentPubKeyHash pkh
       ]
 
-    minAdaVal = Value.lovelaceValueOf $ fromInt 2_000_000
-
     constraints =
       filterLowValue
         daoShare
@@ -170,8 +168,7 @@ mkMarketplaceBuyTx (NftData nftData) = do
               ( Datum $ toData $
                   MarketplaceDatum { getMarketplaceDatum: curr /\ newName }
               )
-              ( newNftValue <> minAdaVal
-              )
+              newNftValue
           ]
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookup constraints
   txWithMetadata <-

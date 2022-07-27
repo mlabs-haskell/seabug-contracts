@@ -354,8 +354,8 @@ buildMintArgs
     -- TODO: Put these hard coded params in a better place, see
     -- https://github.com/mlabs-haskell/seabug-contracts/issues/25
     mintParams = wrap
-      { authorShare: Nat.fromInt' 500
-      , daoShare: Nat.fromInt' 500
+      { authorShare: Nat.fromInt' 1000
+      , daoShare: Nat.fromInt' 1000
       , price: price'
       , lockLockup: BigInt.fromInt 5
       , lockLockupEnd: Slot $ BigNum.fromInt 5
