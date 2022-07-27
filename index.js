@@ -5,6 +5,41 @@
 // You also need to call `spago bundle-module` to generate the module that is
 // imported here. From the repository root, run:
 //   spago bundle-module -m <MAIN> --to output.js
-import("./output.js").then((m) => m.main());
+const seabug = import("./output.js");
 
-console.log("app starting");
+/**
+ * Calls Seabug Contract 'marketPlaceBuy'.
+ * It returns a promise holding no data.
+ *
+ */
+exports.callMarketPlaceBuy = async (config, args) => {
+  const sb = await seabug;
+  return sb.callMarketPlaceBuy(config)(args)();
+};
+
+/**
+ * Calls Seabug Contract 'marketPlaceListNft'.
+ * Returns a promise holding nft listings.
+ *
+ */
+exports.callMarketPlaceListNft = async (config) => {
+  const sb = await seabug;
+  return sb.callMarketPlaceListNft(config)();
+};
+
+exports.callMarketPlaceFetchNft = async (config, args) => {
+  const sb = await seabug;
+  return sb.callMarketPlaceFetchNft(config)(args)();
+};
+
+
+/**
+ * Returns a promise containing the connected wallet's balance.
+ */
+exports.getWalletBalance = async () => {
+  const sb = await seabug;
+  return sb.getWalletBalance();
+};
+
+// Uncomment this for manually minting new tokens (see README)
+// seabug.then((sb) => sb.mint().then(() => console.log("Done")))

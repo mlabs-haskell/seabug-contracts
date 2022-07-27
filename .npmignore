@@ -1,0 +1,15 @@
+.github
+.psc-ide-port
+.spago
+.spago2nix
+dist
+exe
+flake.lock
+Makefile
+node_modules
+output
+src
+test
+*purs
+*.nix
+*.dhall

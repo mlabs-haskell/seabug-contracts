@@ -1,41 +1,32 @@
 module Seabug.CallContract
   ( callMarketPlaceBuy
+  , callMarketPlaceFetchNft
   , callMarketPlaceListNft
-  , callMarketPlaceBuyTest
+  , callMint
   ) where
 
-import Contract.Prelude
+import Contract.Prelude hiding (null)
 
-import Cardano.Types.Value as Cardano.Types.Value
 import Contract.Address (Slot(Slot))
 import Contract.Monad
   ( ConfigParams(ConfigParams)
   , ContractConfig
-  , LogLevel(Debug)
-  , defaultSlotConfig
   , mkContractConfig
   , runContract
   , runContract_
   )
 import Contract.Numeric.Natural (toBigInt)
-import Contract.Prim.ByteArray
-  ( byteArrayToHex
-  , hexToByteArray
-  )
-import Contract.Scripts
-  ( ed25519KeyHashToBytes
-  , ed25519KeyHashFromBytes
-  , scriptHashFromBech32
-  , scriptHashToBech32Unsafe
-  )
+import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
 import Contract.Transaction
-  ( TransactionInput(TransactionInput)
+  ( TransactionInput(..)
   , TransactionOutput(TransactionOutput)
+  , awaitTxConfirmed
   )
 import Contract.Value
   ( CurrencySymbol
   , TokenName
   , Value
+  , currencyMPSHash
   , flattenNonAdaAssets
   , getCurrencySymbol
   , getTokenName
@@ -44,39 +35,75 @@ import Contract.Value
   )
 import Control.Promise (Promise)
 import Control.Promise as Promise
-import Data.Array (singleton)
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
-import Data.Identity (Identity(Identity))
-import Data.List (toUnfoldable)
+import Data.Log.Level (LogLevel(..))
+import Data.Nullable (Nullable, notNull, null)
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
 import Effect.Aff (error)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error)
-import Metadata.Seabug (SeabugMetadata(SeabugMetadata))
-import Metadata.Seabug.Share (unShare)
 import Partial.Unsafe (unsafePartial)
-import Plutus.ToPlutusType (toPlutusType)
+import Plutus.Conversion (fromPlutusAddress)
+import Seabug.Contract.CnftMint (mintCnft)
+import Seabug.Contract.Common (NftResult)
 import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
-import Seabug.Contract.MarketPlaceListNft (ListNftResult, marketPlaceListNft)
+import Seabug.Contract.MarketPlaceFetchNft (marketPlaceFetchNft)
+import Seabug.Contract.MarketPlaceListNft (marketPlaceListNft)
+import Seabug.Contract.Mint (mintWithCollection)
+import Seabug.Metadata.Share (unShare)
+import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
 import Seabug.Types
-  ( NftCollection(NftCollection)
+  ( MintCnftParams
+  , MintParams
+  , NftCollection(NftCollection)
   , NftData(NftData)
   , NftId(NftId)
   )
-import Serialization.Address (addressBech32, intToNetworkId)
+import Serialization.Address (NetworkId, addressBech32, intToNetworkId)
+import Serialization.Hash
+  ( ed25519KeyHashToBytes
+  , ed25519KeyHashFromBytes
+  , scriptHashFromBech32
+  , scriptHashToBech32Unsafe
+  )
+import Types.BigNum as BigNum
 import Types.Natural as Nat
-import Types.UsedTxOuts (newUsedTxOuts)
 import Wallet (mkNamiWalletAff)
 
--- | Exists temporarily for testing purposes
-callMarketPlaceBuyTest :: String -> Effect (Promise String)
-callMarketPlaceBuyTest = Promise.fromAff <<< pure
+callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
+callMint cfg args = Promise.fromAff do
+  contractConfig <- buildContractConfig cfg
+  mintCnftParams /\ mintParams <- liftEffect $ liftEither $ buildMintArgs args
+  runContract contractConfig $ do
+    log "Minting cnft..."
+    txHash /\ cnft <- mintCnft mintCnftParams
+    log $ "Waiting for confirmation of cnft transaction: " <> show txHash
+    awaitTxConfirmed txHash
+    log $ "Cnft transaction confirmed: " <> show txHash
+    log $ "Minted cnft: " <> show cnft
+    log "Minting sgNft..."
+    sgNftTxHash <- mintWithCollection cnft mintParams
+    log $ "Waiting for confirmation of nft transaction: " <> show sgNftTxHash
+    awaitTxConfirmed sgNftTxHash
+    log $ "Nft transaction confirmed: " <> show sgNftTxHash
+
+callMarketPlaceFetchNft
+  :: ContractConfiguration
+  -> TransactionInputOut
+  -> Effect (Promise (Nullable ListNftResultOut))
+callMarketPlaceFetchNft cfg args = Promise.fromAff do
+  contractConfig <- buildContractConfig cfg
+  txInput <- liftEffect $ liftEither $ buildTransactionInput args
+  runContract contractConfig (marketPlaceFetchNft txInput) >>= case _ of
+    Nothing -> pure null
+    Just nftResult -> pure $ notNull $
+      buildNftList (unwrap contractConfig).networkId nftResult
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
---   Returns a JS promise holding no data.
+-- | Returns a JS promise holding no data.
 callMarketPlaceBuy
   :: ContractConfiguration -> BuyNftArgs -> Effect (Promise Unit)
 callMarketPlaceBuy cfg args = Promise.fromAff do
@@ -85,13 +112,13 @@ callMarketPlaceBuy cfg args = Promise.fromAff do
   runContract_ contractConfig (marketplaceBuy nftData)
 
 -- | Calls Seabugs marketPlaceListNft and takes care of converting data types.
---   Returns a JS promise holding nft listings.
+-- | Returns a JS promise holding nft listings.
 callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
   listnft <- runContract contractConfig marketPlaceListNft
-  pure $ buildNftList <$> listnft
+  pure $ buildNftList (unwrap contractConfig).networkId <$> listnft
 
 -- | Configuation needed to call contracts from JS.
 type ContractConfiguration =
@@ -106,7 +133,7 @@ type ContractConfiguration =
   , datumCacheSecureConn :: Boolean
   , networkId :: Int
   , projectId :: String
-  , logLevel :: LogLevel
+  , logLevel :: String -- Trace | Debug | Info | Warn | Error
   }
 
 type BuyNftArgs =
@@ -127,12 +154,13 @@ type BuyNftArgs =
       }
   }
 
--- Placeholder for types I'm not sure how should we represent on frontend.
+type TransactionInputOut = { transactionId :: String, inputIndex :: Int }
+
 type ValueOut = Array
   { currencySymbol :: String, tokenName :: String, amount :: BigInt }
 
 type ListNftResultOut =
-  { input :: { transactionId :: String, inputIndex :: Int }
+  { input :: TransactionInputOut
   , output :: { address :: String, value :: ValueOut, dataHash :: String }
   , metadata ::
       { seabugMetadata ::
@@ -144,12 +172,20 @@ type ListNftResultOut =
           , authorPkh :: String -- PubKeyHash
           , authorShare :: BigInt -- Share
           , marketplaceScript :: String -- ValidatorHash
-          , marketplaceShare :: BigInt -- share
+          , marketplaceShare :: BigInt -- Share
           , ownerPkh :: String -- PubKeyHash
           , ownerPrice :: BigInt --Natural
           }
       , ipfsHash :: String
       }
+  }
+
+type MintArgs =
+  { imageUri :: String
+  , tokenNameString :: String
+  , name :: String
+  , description :: String
+  , price :: BigInt -- Natural
   }
 
 buildContractConfig
@@ -163,6 +199,8 @@ buildContractConfig cfg = do
     $ UInt.fromInt' cfg.datumCachePort
   networkId <- liftM (error "Invalid network id")
     $ intToNetworkId cfg.networkId
+  logLevel <- liftM (error "Invalid log level")
+    $ stringToLogLevel cfg.logLevel
 
   wallet <- Just <$> mkNamiWalletAff
   mkContractConfig $ ConfigParams
@@ -182,19 +220,29 @@ buildContractConfig cfg = do
         , secure: cfg.serverSecureConn
         }
     , networkId: networkId
-    , slotConfig: defaultSlotConfig
-    , logLevel: cfg.logLevel
+    , logLevel: logLevel
     , extraConfig: { projectId: cfg.projectId }
     , wallet
     }
 
-buildNftList :: ListNftResult -> ListNftResultOut
+stringToLogLevel :: String -> Maybe LogLevel
+stringToLogLevel "Trace" = Just Trace
+stringToLogLevel "Debug" = Just Debug
+stringToLogLevel "Info" = Just Info
+stringToLogLevel "Warn" = Just Warn
+stringToLogLevel "Error" = Just Error
+stringToLogLevel _ = Nothing
+
+buildNftList :: NetworkId -> NftResult -> ListNftResultOut
 buildNftList
+  network
   { input: TransactionInput input, output: TransactionOutput output, metadata } =
   let
     transactionId = byteArrayToHex $ unwrap input.transactionId
     inputIndex = UInt.toInt input.index
-    address = addressBech32 output.address
+    -- TODO: What do we do if this fails?
+    address =
+      addressBech32 $ unsafePartial $ fromPlutusAddress network output.address
     dataHash = fromMaybe mempty $ byteArrayToHex <<< unwrap <$> output.dataHash
     ipfsHash = metadata.ipfsHash
     seabugMetadata = convertSeabugMetaData metadata.seabugMetadata
@@ -204,12 +252,8 @@ buildNftList
     , metadata: { ipfsHash, seabugMetadata }
     }
   where
-  convertValue :: Cardano.Types.Value.Value -> ValueOut
-  convertValue v =
-    let
-      (Identity val) = toPlutusType v
-    in
-      mkValueRecord <$> flattenNonAdaAssets val
+  convertValue :: Value -> ValueOut
+  convertValue val = mkValueRecord <$> flattenNonAdaAssets val
 
   mkValueRecord
     :: (CurrencySymbol /\ TokenName /\ BigInt)
@@ -222,18 +266,20 @@ buildNftList
 
   convertSeabugMetaData :: SeabugMetadata -> _
   convertSeabugMetaData (SeabugMetadata m) =
-    { policyId: scriptHashToBech32Unsafe "policy_vkh" $ unwrap m.policyId -- or the prefix should just be 'script'
-    , mintPolicy: byteArrayToHex m.mintPolicy
-    , collectionNftCS: byteArrayToHex $ Cardano.Types.Value.getCurrencySymbol $
-        m.collectionNftCS
+    { policyId: scriptHashToBech32Unsafe "policy_vkh" $ unwrap $
+        currencyMPSHash m.policyId -- or the prefix should just be 'script'
+    , mintPolicy: m.mintPolicy
+    , collectionNftCS: byteArrayToHex $ getCurrencySymbol m.collectionNftCS
     , collectionNftTN: byteArrayToHex $ getTokenName m.collectionNftTN
     , lockingScript: scriptHashToBech32Unsafe "script" $ unwrap m.lockingScript
-    , authorPkh: byteArrayToHex $ ed25519KeyHashToBytes $ unwrap m.authorPkh
+    , authorPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap
+        m.authorPkh
     , authorShare: unShare m.authorShare
     , marketplaceScript: scriptHashToBech32Unsafe "script" $ unwrap
         m.marketplaceScript
     , marketplaceShare: unShare m.marketplaceShare
-    , ownerPkh: byteArrayToHex $ ed25519KeyHashToBytes $ unwrap m.ownerPkh
+    , ownerPkh: byteArrayToHex $ unwrap $ ed25519KeyHashToBytes $ unwrap
+        m.ownerPkh
     , ownerPrice: toBigInt m.ownerPrice
     }
 
@@ -252,7 +298,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
     owner <- note (error $ "Invalid owner: " <> r.owner)
       $ wrap
       <<< wrap
-      <$> (ed25519KeyHashFromBytes =<< hexToByteArray r.owner)
+      <$> (ed25519KeyHashFromBytes <<< wrap =<< hexToByteArray r.owner)
     pure $ NftId
       { collectionNftTn: tn
       , price
@@ -266,7 +312,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
     lockLockupEnd <-
       note (error $ "Invalid nft lockLockupEnd: " <> show r.lockLockupEnd)
         $ Slot
-        <$> (UInt.fromString $ BigInt.toString r.lockLockupEnd)
+        <$> (BigNum.fromString $ BigInt.toString r.lockLockupEnd)
     lockingScript <-
       note (error $ "Invalid nft lockingScript: " <> r.lockingScript)
         $ wrap
@@ -274,7 +320,7 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
     author <- note (error $ "Invalid author: " <> r.author)
       $ wrap
       <<< wrap
-      <$> (ed25519KeyHashFromBytes =<< hexToByteArray r.author)
+      <$> (ed25519KeyHashFromBytes <<< wrap =<< hexToByteArray r.author)
     authorShare <- note (error $ "Invalid authorShare: " <> show r.authorShare)
       $ Nat.fromBigInt r.authorShare
     daoScript <- note (error $ "Invalid nft daoScript: " <> r.daoScript)
@@ -292,3 +338,37 @@ buildNftData { nftCollectionArgs, nftIdArgs } = do
       , daoScript
       , daoShare
       }
+
+buildMintArgs :: MintArgs -> Either Error (MintCnftParams /\ MintParams)
+buildMintArgs
+  { imageUri
+  , tokenNameString
+  , name
+  , description
+  , price
+  } = do
+  price' <- note (error $ "Invalid price: " <> show price)
+    $ Nat.fromBigInt price
+  let
+    mintCnftParams = wrap { imageUri, tokenNameString, name, description }
+    -- TODO: Put these hard coded params in a better place, see
+    -- https://github.com/mlabs-haskell/seabug-contracts/issues/25
+    mintParams = wrap
+      { authorShare: Nat.fromInt' 1000
+      , daoShare: Nat.fromInt' 1000
+      , price: price'
+      , lockLockup: BigInt.fromInt 5
+      , lockLockupEnd: Slot $ BigNum.fromInt 5
+      , feeVaultKeys: []
+      }
+  pure (mintCnftParams /\ mintParams)
+
+buildTransactionInput :: TransactionInputOut -> Either Error TransactionInput
+buildTransactionInput input = do
+  transactionId <-
+    note (error $ "Invalid transaction id: " <> input.transactionId)
+      $ wrap
+      <$> hexToByteArray input.transactionId
+  index <- note (error $ "Invalid input index: " <> show input.inputIndex) $
+    UInt.fromInt' input.inputIndex
+  pure $ wrap { transactionId, index }

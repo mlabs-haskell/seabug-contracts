@@ -108,7 +108,104 @@ let upstream =
       https://github.com/purescript/package-sets/releases/download/psc-0.14.5-20211116/packages.dhall sha256:7ba810597a275e43c83411d2ab0d4b3c54d0b551436f4b1632e9ff3eb62e327a
 
 let additions =
-      {
+      { aeson =
+        { dependencies =
+          [ "aff"
+          , "argonaut"
+          , "argonaut-codecs"
+          , "argonaut-core"
+          , "arrays"
+          , "bifunctors"
+          , "bigints"
+          , "const"
+          , "control"
+          , "effect"
+          , "either"
+          , "exceptions"
+          , "foldable-traversable"
+          , "foreign-object"
+          , "gen"
+          , "identity"
+          , "integers"
+          , "maybe"
+          , "newtype"
+          , "node-buffer"
+          , "node-fs-aff"
+          , "node-path"
+          , "nonempty"
+          , "numbers"
+          , "partial"
+          , "prelude"
+          , "quickcheck"
+          , "record"
+          , "sequences"
+          , "spec"
+          , "strings"
+          , "transformers"
+          , "tuples"
+          , "typelevel"
+          , "typelevel-prelude"
+          , "uint"
+          , "untagged-union"
+          ]
+        , repo = "https://github.com/mlabs-haskell/purescript-aeson.git"
+        , version = "286862a975f4bafbef15540c365bbbb0480e0bf7"
+        }
+      , aeson-helpers =
+        { dependencies =
+          [ "aff"
+          , "argonaut-codecs"
+          , "argonaut-core"
+          , "arrays"
+          , "bifunctors"
+          , "contravariant"
+          , "control"
+          , "effect"
+          , "either"
+          , "enums"
+          , "foldable-traversable"
+          , "foreign-object"
+          , "maybe"
+          , "newtype"
+          , "ordered-collections"
+          , "prelude"
+          , "profunctor"
+          , "psci-support"
+          , "quickcheck"
+          , "record"
+          , "spec"
+          , "spec-quickcheck"
+          , "transformers"
+          , "tuples"
+          , "typelevel-prelude"
+          ]
+        , repo =
+            "https://github.com/mlabs-haskell/purescript-bridge-aeson-helpers.git"
+        , version = "44d0dae060cf78babd4534320192b58c16a6f45b"
+        }
+      , sequences =
+        { dependencies =
+          [ "arrays"
+          , "assert"
+          , "console"
+          , "effect"
+          , "lazy"
+          , "maybe"
+          , "newtype"
+          , "nonempty"
+          , "partial"
+          , "prelude"
+          , "profunctor"
+          , "psci-support"
+          , "quickcheck"
+          , "quickcheck-laws"
+          , "tuples"
+          , "unfoldable"
+          , "unsafe-coerce"
+          ]
+        , repo = "https://github.com/hdgarrood/purescript-sequences"
+        , version = "v3.0.2"
+        }
       , properties =
           { dependencies = ["prelude", "console"]
           , repo = "https://github.com/Risto-Stevcev/purescript-properties.git"
@@ -171,12 +268,10 @@ let additions =
         }
       , cardano-transaction-lib =
           { dependencies =
-            [ "aff"
+            [ "aeson"
+            , "aff"
             , "aff-promise"
             , "affjax"
-            , "argonaut"
-            , "argonaut-codecs"
-            , "argonaut-core"
             , "arraybuffer-types"
             , "arrays"
             , "bifunctors"
@@ -193,7 +288,6 @@ let additions =
             , "exceptions"
             , "foldable-traversable"
             , "foreign-object"
-            , "gen"
             , "identity"
             , "integers"
             , "js-date"
@@ -207,7 +301,6 @@ let additions =
             , "node-buffer"
             , "node-fs"
             , "node-fs-aff"
-            , "node-path"
             , "nonempty"
             , "ordered-collections"
             , "partial"
@@ -234,7 +327,12 @@ let additions =
             , "variant"
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
-        , version = "a83d75e852571e6a8ad2e60c449f198e1b3270a2"
+          -- should be same rev as in flake.nix
+          -- https://github.com/Plutonomicon/cardano-transaction-lib/pull/696
+          -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
+          -- Commit is from our branch calum/metadata-invalid-char-fix which is based off this PR and
+          -- includes a small fix to get the build working. Also updated to include `awaitTxConfirmed`.
+        , version = "32194c502e4a068bf99388b05c708f81612d7541"
         }
       }
-in  upstream // additions
+in upstream // additions

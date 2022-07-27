@@ -1,30 +1,22 @@
 module Seabug.Types
   ( MarketplaceDatum(..)
+  , LockDatum(..)
   , MintAct(..)
   , MintParams(..)
   , NftCollection(..)
   , NftData(..)
   , NftId(..)
+  , MintCnftParams(..)
   , class Hashable
   , hash
   ) where
 
 import Contract.Prelude
 
-import Affjax as Affjax
-import Affjax.RequestBody as Affjax.RequestBody
-import Affjax.ResponseFormat as Affjax.ResponseFormat
-import Cardano.Types.Value as Cardano.Types.Value
-import Contract.Value
-  ( CurrencySymbol
-  , TokenName
-  , getCurrencySymbol
-  , getTokenName
-  , mkCurrencySymbol
-  )
-import Contract.Monad (Contract(Contract), mkHttpUrl)
 import Contract.Address (PaymentPubKeyHash, PubKeyHash)
-import Contract.Aeson (caseAesonObject, getField, jsonToAeson) as Aeson
+import Contract.Aeson as Aeson
+import Contract.Monad (Contract)
+import Contract.Numeric.Natural (Natural, toBigInt)
 import Contract.PlutusData
   ( class FromData
   , class ToData
@@ -32,50 +24,45 @@ import Contract.PlutusData
   , fromData
   , toData
   )
-import Contract.Prim.ByteArray
-  ( ByteArray
-  , byteArrayFromIntArrayUnsafe
-  , byteArrayToHex
-  )
-import Contract.Numeric.Natural (Natural, toBigInt)
-import Contract.Scripts
-  ( ValidatorHash
-  , ed25519KeyHashToBytes
-  , scriptHashToBytes
-  )
+import Contract.Prim.ByteArray (ByteArray, byteArrayFromIntArrayUnsafe)
+import Contract.Scripts (ValidatorHash)
 import Contract.Time (Slot)
-import Control.Monad.Reader.Trans (asks)
+import Contract.Value
+  ( CurrencySymbol
+  , TokenName
+  , getCurrencySymbol
+  , getTokenName
+  )
 import Data.Argonaut as Json
-import Data.Argonaut.Encode.Encoders (encodeString)
-import Data.Bifunctor (bimap, lmap)
 import Data.BigInt (BigInt, fromInt, toInt)
+import Hashing (blake2b256Hash)
 import Partial.Unsafe (unsafePartial)
+import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
 
-blake2bHash :: forall (r :: Row Type). ByteArray -> Contract r (Maybe ByteArray)
-blake2bHash bytes = Contract $ do
-  url <- asks $ (_ <> "/" <> "blake2b") <<< mkHttpUrl <<< _.serverConfig
-  let
-    reqBody :: Maybe Affjax.RequestBody.RequestBody
-    reqBody = Just
-      $ Affjax.RequestBody.Json
-      $ encodeString
-      $ byteArrayToHex bytes
-  liftAff (Affjax.post Affjax.ResponseFormat.json url reqBody)
-    <#> either (const Nothing) (hush <<< Json.decodeJson <<< _.body)
+newtype MintCnftParams = MintCnftParams
+  { imageUri :: String
+  -- | The token name of the collection nft
+  , tokenNameString :: String
+  , name :: String
+  , description :: String
+  }
 
--- Field names have been simplified due to row polymorphism. Please let me know
--- if the field names must be exact.
+derive instance Generic MintCnftParams _
+derive instance Newtype MintCnftParams _
+derive newtype instance Eq MintCnftParams
+
+instance Show MintCnftParams where
+  show = genericShow
+
 -- | Parameters that need to be submitted when minting a new NFT.
 newtype MintParams = MintParams
-  { -- | Shares retained by author.
-    authorShare :: Natural
+  { authorShare :: Natural
   , daoShare :: Natural
   , -- | Listing price of the NFT, in Lovelace.
     price :: Natural
   , lockLockup :: BigInt
   , lockLockupEnd :: Slot
-  , fakeAuthor :: Maybe PaymentPubKeyHash
-  , feeVaultKeys :: Array PubKeyHash -- `List` is also an option
+  , feeVaultKeys :: Array PubKeyHash
   }
 
 derive instance Generic MintParams _
@@ -86,14 +73,13 @@ instance Show MintParams where
   show = genericShow
 
 instance FromData MintParams where
-  fromData (Constr n [ as, ds, pr, ll, lle, fa, fvk ]) | n == zero =
+  fromData (Constr n [ as, ds, pr, ll, lle, fvk ]) | n == zero =
     MintParams <$>
       ( { authorShare: _
         , daoShare: _
         , price: _
         , lockLockup: _
         , lockLockupEnd: _
-        , fakeAuthor: _
         , feeVaultKeys: _
         }
           <$> fromData as
@@ -101,7 +87,6 @@ instance FromData MintParams where
           <*> fromData pr
           <*> fromData ll
           <*> fromData lle
-          <*> fromData fa
           <*> fromData fvk
       )
   fromData _ = Nothing
@@ -114,7 +99,6 @@ instance ToData MintParams where
         , price
         , lockLockup
         , lockLockupEnd
-        , fakeAuthor
         , feeVaultKeys
         }
     ) =
@@ -124,7 +108,6 @@ instance ToData MintParams where
       , toData price
       , toData lockLockup
       , toData lockLockupEnd
-      , toData fakeAuthor
       , toData feeVaultKeys
       ]
 
@@ -156,8 +139,6 @@ instance ToData NftId where
   toData (NftId { collectionNftTn, price, owner }) =
     Constr zero [ toData collectionNftTn, toData price, toData owner ]
 
--- Field names have been simplified due to row polymorphism. Please let me know
--- if the field names must be exact.
 newtype NftCollection = NftCollection
   { collectionNftCs :: CurrencySymbol
   , lockLockup :: BigInt
@@ -174,33 +155,20 @@ derive instance Newtype NftCollection _
 derive newtype instance Eq NftCollection
 derive newtype instance Ord NftCollection
 
--- Note the renaming of fields from their Plutus equivalents, e.g.
--- "nftCollection'collectionNftCs" to "collectionNftCs".
-instance Json.DecodeJson NftCollection where
-  decodeJson j =
-    Json.caseJsonObject
+instance Aeson.DecodeAeson NftCollection where
+  decodeAeson j =
+    Aeson.caseAesonObject
       (Left $ Json.TypeMismatch "Expected Json Object")
       ( \o ->
           do
-            collectionNftCs <- do
-              nftCs <- Json.getField o "nftCollection'collectionNftCs"
-              note (Json.TypeMismatch "expected currency symbol")
-                $ mkCurrencySymbol
-                $ Cardano.Types.Value.getCurrencySymbol nftCs
-
-            lockLockupEnd <- Json.getField o "nftCollection'lockLockupEnd"
-            lockingScript <- Json.getField o "nftCollection'lockingScript"
-            author <- Json.getField o "nftCollection'author"
-            authorShare <- Json.getField o "nftCollection'authorShare"
-            daoScript <- Json.getField o "nftCollection'daoScript"
-            daoShare <- Json.getField o "nftCollection'daoShare"
-            -- Is the more efficient way to do this? Leave this until the end incase
-            -- we fail earlier.
-            let aeson = Aeson.jsonToAeson j
-            lockLockup <- Aeson.caseAesonObject
-              (Left $ Json.TypeMismatch "Expected Aeson Object")
-              (flip Aeson.getField "nftCollection'lockLockup")
-              aeson
+            collectionNftCs <- Aeson.getField o "nftCollection'collectionNftCs"
+            lockLockupEnd <- Aeson.getField o "nftCollection'lockLockupEnd"
+            lockingScript <- Aeson.getField o "nftCollection'lockingScript"
+            author <- Aeson.getField o "nftCollection'author"
+            authorShare <- Aeson.getField o "nftCollection'authorShare"
+            daoScript <- Aeson.getField o "nftCollection'daoScript"
+            daoShare <- Aeson.getField o "nftCollection'daoShare"
+            lockLockup <- Aeson.getField o "nftCollection'lockLockup"
             pure $ NftCollection
               { collectionNftCs
               , lockLockup
@@ -359,7 +327,7 @@ class Hashable (a :: Type) where
     -> Contract r (Maybe ByteArray) -- Plutus BuiltinByteString
 
 instance Hashable ByteArray where
-  hash = blake2bHash
+  hash = map Just <<< liftAff <<< blake2b256Hash
 
 instance Hashable Natural where
   hash = hash <<< toBin <<< toBigInt
@@ -394,10 +362,10 @@ instance Hashable TokenName where
   hash = hash <<< getTokenName
 
 instance Hashable ValidatorHash where
-  hash = hash <<< scriptHashToBytes <<< unwrap
+  hash = hash <<< unwrap <<< scriptHashToBytes <<< unwrap
 
 instance Hashable PaymentPubKeyHash where
-  hash = hash <<< ed25519KeyHashToBytes <<< unwrap <<< unwrap
+  hash = hash <<< unwrap <<< ed25519KeyHashToBytes <<< unwrap <<< unwrap
 
 instance (Hashable a, Hashable b) => Hashable (a /\ b) where
   hash (a /\ b) = ((<>) <$> hash a <*> hash b) >>= maybe (pure Nothing) hash
