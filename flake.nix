@@ -13,7 +13,7 @@
       # should be same rev as in packages.dhall
       # To update, do `spago2nix generate`
       # calum/metadata-invalid-char-fix
-      rev = "32194c502e4a068bf99388b05c708f81612d7541";
+      rev = "c1cebea85e0ef68e762d70152dd7e2abda458a28";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };

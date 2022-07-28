@@ -266,9 +266,23 @@ let additions =
         , repo = "https://github.com/juspay/medea-ps.git"
         , version = "8b215851959aa8bbf33e6708df6bd683c89d1a5a"
         }
+      , purescript-toppokki =
+        { dependencies =
+          [ "prelude"
+          , "record"
+          , "functions"
+          , "node-http"
+          , "aff-promise"
+          , "node-buffer"
+          , "node-fs-aff"
+          ]
+        , repo = "https://github.com/firefrorefiddle/purescript-toppokki"
+        , version = "6983e07bf0aa55ab779bcef12df3df339a2b5bd9"
+        }
       , cardano-transaction-lib =
           { dependencies =
             [ "aeson"
+            , "aeson-helpers"
             , "aff"
             , "aff-promise"
             , "affjax"
@@ -279,7 +293,9 @@ let additions =
             , "checked-exceptions"
             , "console"
             , "const"
+            , "contravariant"
             , "control"
+            , "datetime"
             , "debug"
             , "effect"
             , "either"
@@ -287,7 +303,9 @@ let additions =
             , "enums"
             , "exceptions"
             , "foldable-traversable"
+            , "foreign"
             , "foreign-object"
+            , "http-methods"
             , "identity"
             , "integers"
             , "js-date"
@@ -295,26 +313,38 @@ let additions =
             , "lists"
             , "maybe"
             , "medea"
+            , "media-types"
             , "monad-logger"
             , "mote"
             , "newtype"
             , "node-buffer"
             , "node-fs"
             , "node-fs-aff"
+            , "node-path"
+            , "node-process"
             , "nonempty"
+            , "optparse"
+            , "now"
+            , "numbers"
             , "ordered-collections"
+            , "orders"
+            , "parallel"
             , "partial"
             , "prelude"
             , "profunctor"
             , "profunctor-lenses"
+            , "purescript-toppokki"
             , "quickcheck"
+            , "quickcheck-combinators"
             , "quickcheck-laws"
             , "rationals"
             , "record"
             , "refs"
             , "spec"
+            , "spec-quickcheck"
             , "strings"
             , "tailrec"
+            , "text-encoding"
             , "these"
             , "transformers"
             , "tuples"
@@ -332,7 +362,7 @@ let additions =
           -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
           -- Commit is from our branch calum/metadata-invalid-char-fix which is based off this PR and
           -- includes a small fix to get the build working. Also updated to include `awaitTxConfirmed`.
-        , version = "32194c502e4a068bf99388b05c708f81612d7541"
+        , version = "c1cebea85e0ef68e762d70152dd7e2abda458a28"
         }
       }
 in upstream // additions
