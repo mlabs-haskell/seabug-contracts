@@ -8,13 +8,8 @@ module Seabug.CallContract
 import Contract.Prelude hiding (null)
 
 import Contract.Address (Slot(Slot))
-import Contract.Monad
-  ( ConfigParams(ConfigParams)
-  , ContractConfig
-  , mkContractConfig
-  , runContract
-  , runContract_
-  )
+import Contract.Config (WalletSpec(..))
+import Contract.Monad (ContractEnv, mkContractEnv, runContractInEnv)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
 import Contract.Transaction
@@ -71,13 +66,12 @@ import Serialization.Hash
   )
 import Types.BigNum as BigNum
 import Types.Natural as Nat
-import Wallet (mkNamiWalletAff)
 
 callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
   mintCnftParams /\ mintParams <- liftEffect $ liftEither $ buildMintArgs args
-  runContract contractConfig $ do
+  runContractInEnv contractConfig $ do
     log "Minting cnft..."
     txHash /\ cnft <- mintCnft mintCnftParams
     log $ "Waiting for confirmation of cnft transaction: " <> show txHash
@@ -97,10 +91,10 @@ callMarketPlaceFetchNft
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
   txInput <- liftEffect $ liftEither $ buildTransactionInput args
-  runContract contractConfig (marketPlaceFetchNft txInput) >>= case _ of
+  runContractInEnv contractConfig (marketPlaceFetchNft txInput) >>= case _ of
     Nothing -> pure null
     Just nftResult -> pure $ notNull $
-      buildNftList (unwrap contractConfig).networkId nftResult
+      buildNftList (unwrap contractConfig).config.networkId nftResult
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 -- | Returns a JS promise holding no data.
@@ -109,7 +103,7 @@ callMarketPlaceBuy
 callMarketPlaceBuy cfg args = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
   nftData <- liftEffect $ liftEither $ buildNftData args
-  runContract_ contractConfig (marketplaceBuy nftData)
+  runContractInEnv contractConfig (marketplaceBuy nftData)
 
 -- | Calls Seabugs marketPlaceListNft and takes care of converting data types.
 -- | Returns a JS promise holding nft listings.
@@ -117,8 +111,8 @@ callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
   contractConfig <- buildContractConfig cfg
-  listnft <- runContract contractConfig marketPlaceListNft
-  pure $ buildNftList (unwrap contractConfig).networkId <$> listnft
+  listnft <- runContractInEnv contractConfig marketPlaceListNft
+  pure $ buildNftList (unwrap contractConfig).config.networkId <$> listnft
 
 -- | Configuation needed to call contracts from JS.
 type ContractConfiguration =
@@ -189,7 +183,7 @@ type MintArgs =
   }
 
 buildContractConfig
-  :: ContractConfiguration -> Aff (ContractConfig (projectId :: String))
+  :: ContractConfiguration -> Aff (ContractEnv (projectId :: String))
 buildContractConfig cfg = do
   serverPort <- liftM (error "Invalid server port number")
     $ UInt.fromInt' cfg.serverPort
@@ -202,27 +196,30 @@ buildContractConfig cfg = do
   logLevel <- liftM (error "Invalid log level")
     $ stringToLogLevel cfg.logLevel
 
-  wallet <- Just <$> mkNamiWalletAff
-  mkContractConfig $ ConfigParams
+  mkContractEnv $
     { ogmiosConfig:
         { port: ogmiosPort
         , host: cfg.ogmiosHost
         , secure: cfg.ogmiosSecureConn
+        , path: Nothing
         }
     , datumCacheConfig:
         { port: datumCachePort
         , host: cfg.datumCacheHost
         , secure: cfg.datumCacheSecureConn
+        , path: Nothing
         }
     , ctlServerConfig:
         { port: serverPort
         , host: cfg.serverHost
         , secure: cfg.serverSecureConn
+        , path: Nothing
         }
     , networkId: networkId
     , logLevel: logLevel
     , extraConfig: { projectId: cfg.projectId }
-    , wallet
+    , walletSpec: Just ConnectToNami
+    , customLogger: Nothing
     }
 
 stringToLogLevel :: String -> Maybe LogLevel

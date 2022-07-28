@@ -6,7 +6,13 @@ module Seabug.Contract.MarketPlaceListNft
 import Contract.Prelude
 
 import Contract.Address (getNetworkId, typedValidatorEnterpriseAddress)
-import Contract.Monad (Contract, liftContractE, liftContractM, liftedM)
+import Contract.Monad
+  ( Contract
+  , asksConfig
+  , liftContractE
+  , liftContractM
+  , liftedM
+  )
 import Contract.Numeric.Natural as Natural
 import Contract.PlutusData (fromData, getDatumsByHashes)
 import Contract.Transaction (TransactionOutput(TransactionOutput))
@@ -14,7 +20,6 @@ import Contract.Utxos (utxosAt)
 import Contract.Value (valueOf)
 import Control.Alternative (guard)
 import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
-import Control.Monad.Reader (asks)
 import Control.Parallel (parTraverse)
 import Data.Array (catMaybes, mapMaybe)
 import Data.Map as Map
@@ -33,7 +38,7 @@ marketPlaceListNft
 marketPlaceListNft = do
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
   networkId <- getNetworkId
-  projectId <- asks $ unwrap >>> _.projectId
+  projectId <- asksConfig $ _.projectId
   scriptAddr <-
     liftContractM "marketPlaceListNft: Cannot convert validator hash to address"
       $ typedValidatorEnterpriseAddress networkId

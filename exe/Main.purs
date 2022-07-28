@@ -3,13 +3,13 @@ module Main (main) where
 import Contract.Prelude
 
 import Contract.Address (ownPaymentPubKeyHash)
-import Contract.Monad (defaultTestnetContractConfig, runContract_)
+import Contract.Config (testnetConfig)
+import Contract.Monad (runContract)
 import Effect.Aff (launchAff_)
 
 main :: Effect Unit
 main = launchAff_ $ do
-  cfg <- defaultTestnetContractConfig
-  runContract_ cfg
+  runContract testnetConfig
     $ log
     <<< show
     =<< ownPaymentPubKeyHash

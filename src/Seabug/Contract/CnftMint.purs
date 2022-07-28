@@ -25,7 +25,6 @@ import Contract.Value
   )
 import Data.Array (head)
 import Data.Map as Map
-import Data.NonEmpty as NonEmpty
 import Metadata.Cip25.Cip25String (mkCip25String)
 import Metadata.Cip25.V2 (Cip25Metadata(..), Cip25MetadataEntry(..))
 import Seabug.CnftMintPolicy (mkCnftMintingPolicy)

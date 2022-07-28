@@ -5,11 +5,11 @@ module Seabug.Contract.MarketPlaceFetchNft
 
 import Contract.Prelude
 
-import Contract.Monad (Contract, liftContractM, liftedE, liftedM, logWarn')
+import Contract.Log (logWarn')
+import Contract.Monad (Contract, asksConfig, liftContractM, liftedE, liftedM)
 import Contract.PlutusData (fromData, getDatumByHash)
 import Contract.Transaction (TransactionInput, TransactionOutput(..))
 import Contract.Utxos (getUtxo)
-import Control.Monad.Reader (asks)
 import Seabug.Contract.Common (NftResult)
 import Seabug.Metadata (getFullSeabugMetadataWithBackoff)
 import Seabug.Types (MarketplaceDatum(..))
@@ -32,7 +32,7 @@ marketPlaceFetchNft ref = do
       MarketplaceDatum { getMarketplaceDatum: datum } <-
         liftedM "Could not get datum for NFT" $ getDatumByHash datumHash <#>
           (_ >>= unwrap >>> fromData)
-      projectId <- asks $ unwrap >>> _.projectId
+      projectId <- asksConfig $ _.projectId
       metadata <- liftedE $ liftAff $
         getFullSeabugMetadataWithBackoff datum projectId
       pure $ Just { input: ref, output, metadata }

@@ -2,17 +2,10 @@ module Seabug.Test (main) where
 
 import Contract.Prelude
 
-import Contract.Monad
-  ( Contract
-  , defaultTestnetContractConfig
-  , liftContractM
-  , runContract_
-  )
+import Contract.Config (testnetNamiConfig)
+import Contract.Monad (Contract, liftContractM, runContract)
 import Contract.Numeric.Natural (fromBigInt')
-import Contract.Prim.ByteArray
-  ( byteArrayFromAscii
-  , hexToByteArray
-  )
+import Contract.Prim.ByteArray (byteArrayFromAscii, hexToByteArray)
 import Contract.Time (Slot(Slot))
 import Contract.Value (mkCurrencySymbol, mkTokenName)
 import Data.BigInt as BigInt
@@ -28,8 +21,7 @@ import Types.BigNum as BigNum
 
 main :: Effect Unit
 main = launchAff_ $ do
-  cfg <- defaultTestnetContractConfig
-  runContract_ cfg $ do
+  runContract testnetNamiConfig $ do
     marketplaceBuy =<< testNftData
 
 -- collectionNftCs 1 "cf0c1cbf47537f238f756fc1be191abf76009e1988910092184c4b7f"
