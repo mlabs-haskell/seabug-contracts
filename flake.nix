@@ -24,7 +24,13 @@
       perSystem = nixpkgs.lib.genAttrs defaultSystems;
       nixpkgsFor = system: import nixpkgs {
         inherit system;
-        overlays = [ cardano-transaction-lib.overlay ];
+        overlays = [
+          cardano-transaction-lib.overlay
+          (_: _: {
+            ctl-server =
+                cardano-transaction-lib.packages.${system}."ctl-server:exe:ctl-server";
+          })
+        ];
       };
       psProjectFor = system:
         let
@@ -35,9 +41,14 @@
           inherit pkgs src;
           projectName = "seabug-contracts";
           shell = {
-            packages = [
-              pkgs.easy-ps.purs-tidy
-              pkgs.fd
+            packages = with pkgs; [
+              easy-ps.purs-tidy
+              fd
+              plutip-server
+              ctl-server
+              ogmios
+              ogmios-datum-cache
+              postgresql
             ];
           };
         };
