@@ -285,6 +285,7 @@ let additions =
             , "aeson-helpers"
             , "aff"
             , "aff-promise"
+            , "aff-retry"
             , "affjax"
             , "arraybuffer-types"
             , "arrays"
@@ -318,10 +319,12 @@ let additions =
             , "mote"
             , "newtype"
             , "node-buffer"
+            , "node-child-process"
             , "node-fs"
             , "node-fs-aff"
             , "node-path"
             , "node-process"
+            , "node-streams"
             , "nonempty"
             , "optparse"
             , "now"
@@ -330,6 +333,7 @@ let additions =
             , "orders"
             , "parallel"
             , "partial"
+            , "posix-types"
             , "prelude"
             , "profunctor"
             , "profunctor-lenses"
@@ -362,7 +366,7 @@ let additions =
           -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
           -- Commit is from our branch calum/metadata-invalid-char-fix which is based off this PR and
           -- includes a small fix to get the build working. Also updated to include `awaitTxConfirmed`.
-        , version = "c1cebea85e0ef68e762d70152dd7e2abda458a28"
+        , version = "07bd6264f51741ab14ae57b39a081a084dcc7a0a"
         }
       }
 in upstream // additions
