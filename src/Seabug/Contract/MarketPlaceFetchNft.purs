@@ -6,7 +6,7 @@ module Seabug.Contract.MarketPlaceFetchNft
 import Contract.Prelude
 
 import Contract.Log (logWarn')
-import Contract.Monad (Contract, asksConfig, liftContractM, liftedE, liftedM)
+import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
 import Contract.PlutusData (fromData, getDatumByHash)
 import Contract.Transaction (TransactionInput, TransactionOutput(..))
 import Contract.Utxos (getUtxo)
@@ -19,9 +19,10 @@ import Seabug.Types (MarketplaceDatum(..))
 -- | input has been spent (for example if the NFT has been bought).
 marketPlaceFetchNft
   :: forall (r :: Row Type)
-   . TransactionInput
-  -> Contract (projectId :: String | r) (Maybe NftResult)
-marketPlaceFetchNft ref = do
+   . String
+  -> TransactionInput
+  -> Contract r (Maybe NftResult)
+marketPlaceFetchNft projectId ref = do
   getUtxo ref >>= case _ of
     Nothing -> do
       logWarn' "Could not find NFT utxo, it may have been spent"
@@ -32,7 +33,6 @@ marketPlaceFetchNft ref = do
       MarketplaceDatum { getMarketplaceDatum: datum } <-
         liftedM "Could not get datum for NFT" $ getDatumByHash datumHash <#>
           (_ >>= unwrap >>> fromData)
-      projectId <- asksConfig $ _.projectId
       metadata <- liftedE $ liftAff $
         getFullSeabugMetadataWithBackoff datum projectId
       pure $ Just { input: ref, output, metadata }

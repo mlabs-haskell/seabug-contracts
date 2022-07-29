@@ -94,10 +94,11 @@ callMarketPlaceFetchNft
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
   contractConfig <- liftBuilder $ buildContractConfig cfg
   txInput <- liftBuilder $ buildTransactionInput args
-  runContract contractConfig (marketPlaceFetchNft txInput) >>= case _ of
-    Nothing -> pure null
-    Just nftResult -> pure $ notNull $
-      buildNftList contractConfig.networkId nftResult
+  runContract contractConfig (marketPlaceFetchNft cfg.projectId txInput) >>=
+    case _ of
+      Nothing -> pure null
+      Just nftResult -> pure $ notNull $
+        buildNftList contractConfig.networkId nftResult
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 -- | Returns a JS promise holding no data.
@@ -114,7 +115,7 @@ callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
   contractConfig <- liftBuilder $ buildContractConfig cfg
-  listnft <- runContract contractConfig marketPlaceListNft
+  listnft <- runContract contractConfig (marketPlaceListNft cfg.projectId)
   pure $ buildNftList contractConfig.networkId <$> listnft
 
 -- | Configuation needed to call contracts from JS.
@@ -186,7 +187,7 @@ type MintArgs =
   }
 
 buildContractConfig
-  :: ContractConfiguration -> Either Error (ConfigParams (projectId :: String))
+  :: ContractConfiguration -> Either Error (ConfigParams ())
 buildContractConfig cfg = do
   serverPort <- note (error "Invalid server port number")
     $ UInt.fromInt' cfg.serverPort
@@ -220,7 +221,7 @@ buildContractConfig cfg = do
         }
     , networkId: networkId
     , logLevel: logLevel
-    , extraConfig: { projectId: cfg.projectId }
+    , extraConfig: {}
     , walletSpec: Just ConnectToNami
     , customLogger: Nothing
     }
