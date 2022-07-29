@@ -8,8 +8,8 @@ module Seabug.CallContract
 import Contract.Prelude hiding (null)
 
 import Contract.Address (Slot(Slot))
-import Contract.Config (WalletSpec(..))
-import Contract.Monad (ContractEnv, mkContractEnv, runContractInEnv)
+import Contract.Config (WalletSpec(..), ConfigParams)
+import Contract.Monad (runContract)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
 import Contract.Transaction
@@ -67,11 +67,14 @@ import Serialization.Hash
 import Types.BigNum as BigNum
 import Types.Natural as Nat
 
+liftBuilder :: forall a. Either Error a -> Aff a
+liftBuilder = liftEffect <<< liftEither
+
 callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do
-  contractConfig <- buildContractConfig cfg
-  mintCnftParams /\ mintParams <- liftEffect $ liftEither $ buildMintArgs args
-  runContractInEnv contractConfig $ do
+  contractConfig <- liftBuilder $ buildContractConfig cfg
+  mintCnftParams /\ mintParams <- liftBuilder $ buildMintArgs args
+  runContract contractConfig $ do
     log "Minting cnft..."
     txHash /\ cnft <- mintCnft mintCnftParams
     log $ "Waiting for confirmation of cnft transaction: " <> show txHash
@@ -89,30 +92,30 @@ callMarketPlaceFetchNft
   -> TransactionInputOut
   -> Effect (Promise (Nullable ListNftResultOut))
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
-  contractConfig <- buildContractConfig cfg
-  txInput <- liftEffect $ liftEither $ buildTransactionInput args
-  runContractInEnv contractConfig (marketPlaceFetchNft txInput) >>= case _ of
+  contractConfig <- liftBuilder $ buildContractConfig cfg
+  txInput <- liftBuilder $ buildTransactionInput args
+  runContract contractConfig (marketPlaceFetchNft txInput) >>= case _ of
     Nothing -> pure null
     Just nftResult -> pure $ notNull $
-      buildNftList (unwrap contractConfig).config.networkId nftResult
+      buildNftList contractConfig.networkId nftResult
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 -- | Returns a JS promise holding no data.
 callMarketPlaceBuy
   :: ContractConfiguration -> BuyNftArgs -> Effect (Promise Unit)
 callMarketPlaceBuy cfg args = Promise.fromAff do
-  contractConfig <- buildContractConfig cfg
-  nftData <- liftEffect $ liftEither $ buildNftData args
-  runContractInEnv contractConfig (marketplaceBuy nftData)
+  contractConfig <- liftBuilder $ buildContractConfig cfg
+  nftData <- liftBuilder $ buildNftData args
+  runContract contractConfig (marketplaceBuy nftData)
 
 -- | Calls Seabugs marketPlaceListNft and takes care of converting data types.
 -- | Returns a JS promise holding nft listings.
 callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
-  contractConfig <- buildContractConfig cfg
-  listnft <- runContractInEnv contractConfig marketPlaceListNft
-  pure $ buildNftList (unwrap contractConfig).config.networkId <$> listnft
+  contractConfig <- liftBuilder $ buildContractConfig cfg
+  listnft <- runContract contractConfig marketPlaceListNft
+  pure $ buildNftList contractConfig.networkId <$> listnft
 
 -- | Configuation needed to call contracts from JS.
 type ContractConfiguration =
@@ -183,20 +186,20 @@ type MintArgs =
   }
 
 buildContractConfig
-  :: ContractConfiguration -> Aff (ContractEnv (projectId :: String))
+  :: ContractConfiguration -> Either Error (ConfigParams (projectId :: String))
 buildContractConfig cfg = do
-  serverPort <- liftM (error "Invalid server port number")
+  serverPort <- note (error "Invalid server port number")
     $ UInt.fromInt' cfg.serverPort
-  ogmiosPort <- liftM (error "Invalid ogmios port number")
+  ogmiosPort <- note (error "Invalid ogmios port number")
     $ UInt.fromInt' cfg.ogmiosPort
-  datumCachePort <- liftM (error "Invalid datum cache port number")
+  datumCachePort <- note (error "Invalid datum cache port number")
     $ UInt.fromInt' cfg.datumCachePort
-  networkId <- liftM (error "Invalid network id")
+  networkId <- note (error "Invalid network id")
     $ intToNetworkId cfg.networkId
-  logLevel <- liftM (error "Invalid log level")
+  logLevel <- note (error "Invalid log level")
     $ stringToLogLevel cfg.logLevel
 
-  mkContractEnv $
+  pure
     { ogmiosConfig:
         { port: ogmiosPort
         , host: cfg.ogmiosHost
