@@ -28,6 +28,7 @@ import Contract.Value
   , mkCurrencySymbol
   , mkTokenName
   )
+import Control.Monad.Reader (runReaderT)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.BigInt (BigInt)
@@ -56,6 +57,8 @@ import Seabug.Types
   , NftCollection(NftCollection)
   , NftData(NftData)
   , NftId(NftId)
+  , SeabugContract
+  , SeabugContractEnv
   )
 import Serialization.Address (NetworkId, addressBech32, intToNetworkId)
 import Serialization.Hash
@@ -66,6 +69,14 @@ import Serialization.Hash
   )
 import Types.BigNum as BigNum
 import Types.Natural as Nat
+
+runSeabugContract
+  :: forall (r :: Row Type) a
+   . SeabugContractEnv
+  -> ConfigParams r
+  -> SeabugContract a
+  -> Aff a
+runSeabugContract env conf contract = runContract conf $ runReaderT contract env
 
 liftBuilder :: forall a. Either Error a -> Aff a
 liftBuilder = liftEffect <<< liftEither
@@ -94,7 +105,8 @@ callMarketPlaceFetchNft
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
   contractConfig <- liftBuilder $ buildContractConfig cfg
   txInput <- liftBuilder $ buildTransactionInput args
-  runContract contractConfig (marketPlaceFetchNft txInput) >>= case _ of
+  runSeabugContract { projectId: cfg.projectId } contractConfig
+    (marketPlaceFetchNft txInput) >>= case _ of
     Nothing -> pure null
     Just nftResult -> pure $ notNull $
       buildNftList contractConfig.networkId nftResult
@@ -114,7 +126,8 @@ callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
   contractConfig <- liftBuilder $ buildContractConfig cfg
-  listnft <- runContract contractConfig marketPlaceListNft
+  listnft <- runSeabugContract { projectId: cfg.projectId } contractConfig
+    marketPlaceListNft
   pure $ buildNftList contractConfig.networkId <$> listnft
 
 -- | Configuation needed to call contracts from JS.

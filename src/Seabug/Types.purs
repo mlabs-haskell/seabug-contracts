@@ -1,15 +1,18 @@
 module Seabug.Types
-  ( MarketplaceDatum(..)
-  , LockDatum(..)
+  ( LockDatum(..)
+  , MarketplaceDatum(..)
   , MintAct(..)
+  , MintCnftParams(..)
   , MintParams(..)
   , NftCollection(..)
   , NftData(..)
   , NftId(..)
-  , MintCnftParams(..)
+  , SeabugContract
+  , SeabugContractEnv
   , class Hashable
   , hash
-  ) where
+  )
+  where
 
 import Contract.Prelude
 
@@ -33,11 +36,17 @@ import Contract.Value
   , getCurrencySymbol
   , getTokenName
   )
+import Control.Monad.Reader (ReaderT)
 import Data.Argonaut as Json
 import Data.BigInt (BigInt, fromInt, toInt)
 import Hashing (blake2b256Hash)
 import Partial.Unsafe (unsafePartial)
 import Serialization.Hash (ed25519KeyHashToBytes, scriptHashToBytes)
+
+type SeabugContractEnv = { projectId :: String }
+
+type SeabugContract a =
+  forall (r :: Row Type). ReaderT SeabugContractEnv (Contract r) a
 
 newtype MintCnftParams = MintCnftParams
   { imageUri :: String
