@@ -1,6 +1,5 @@
 module Seabug
   ( module Seabug.CallContract
-  , module QueryM.Utxos
   , mint
   ) where
 
@@ -8,12 +7,12 @@ import Contract.Prelude
 
 import Control.Promise (Promise)
 import Data.BigInt as BigInt
-import QueryM.Utxos (getWalletBalance)
 import Seabug.CallContract
   ( callMarketPlaceBuy
   , callMarketPlaceListNft
   , callMarketPlaceFetchNft
   , callMint
+  , callGetWalletBalance
   )
 
 mint :: Effect (Promise Unit)

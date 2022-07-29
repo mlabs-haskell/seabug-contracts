@@ -36,9 +36,9 @@ exports.callMarketPlaceFetchNft = async (config, args) => {
 /**
  * Returns a promise containing the connected wallet's balance.
  */
-exports.getWalletBalance = async () => {
+exports.getWalletBalance = async (config) => {
   const sb = await seabug;
-  return sb.getWalletBalance();
+  return sb.callGetWalletBalance(config);
 };
 
 // Uncomment this for manually minting new tokens (see README)

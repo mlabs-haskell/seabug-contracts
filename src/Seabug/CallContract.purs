@@ -1,5 +1,6 @@
 module Seabug.CallContract
-  ( callMarketPlaceBuy
+  ( callGetWalletBalance
+  , callMarketPlaceBuy
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
   , callMint
@@ -17,6 +18,7 @@ import Contract.Transaction
   , TransactionOutput(TransactionOutput)
   , awaitTxConfirmed
   )
+import Contract.Utxos (getWalletBalance)
 import Contract.Value
   ( CurrencySymbol
   , TokenName
@@ -33,7 +35,7 @@ import Control.Promise as Promise
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Data.Log.Level (LogLevel(..))
-import Data.Nullable (Nullable, notNull, null)
+import Data.Nullable (Nullable, notNull, null, toNullable)
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
@@ -69,6 +71,12 @@ import Types.Natural as Nat
 
 liftBuilder :: forall a. Either Error a -> Aff a
 liftBuilder = liftEffect <<< liftEither
+
+callGetWalletBalance
+  :: ContractConfiguration -> Effect (Promise (Nullable Value))
+callGetWalletBalance cfg = Promise.fromAff do
+  contractConfig <- liftBuilder $ buildContractConfig cfg
+  toNullable <$> runContract contractConfig getWalletBalance
 
 callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do
