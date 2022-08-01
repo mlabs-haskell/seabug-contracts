@@ -40,7 +40,6 @@ import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
 import Effect.Aff (error)
-import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import Partial.Unsafe (unsafePartial)
 import Plutus.Conversion (fromPlutusAddress)
@@ -69,19 +68,16 @@ import Serialization.Hash
 import Types.BigNum as BigNum
 import Types.Natural as Nat
 
-liftBuilder :: forall a. Either Error a -> Aff a
-liftBuilder = liftEffect <<< liftEither
-
 callGetWalletBalance
   :: ContractConfiguration -> Effect (Promise (Nullable Value))
 callGetWalletBalance cfg = Promise.fromAff do
-  contractConfig <- liftBuilder $ buildContractConfig cfg
+  contractConfig <- liftEither $ buildContractConfig cfg
   toNullable <$> runContract contractConfig getWalletBalance
 
 callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do
-  contractConfig <- liftBuilder $ buildContractConfig cfg
-  mintCnftParams /\ mintParams <- liftBuilder $ buildMintArgs args
+  contractConfig <- liftEither $ buildContractConfig cfg
+  mintCnftParams /\ mintParams <- liftEither $ buildMintArgs args
   runContract contractConfig $ do
     log "Minting cnft..."
     txHash /\ cnft <- mintCnft mintCnftParams
@@ -100,8 +96,8 @@ callMarketPlaceFetchNft
   -> TransactionInputOut
   -> Effect (Promise (Nullable ListNftResultOut))
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
-  contractConfig <- liftBuilder $ buildContractConfig cfg
-  txInput <- liftBuilder $ buildTransactionInput args
+  contractConfig <- liftEither $ buildContractConfig cfg
+  txInput <- liftEither $ buildTransactionInput args
   runContract contractConfig (marketPlaceFetchNft cfg.projectId txInput) >>=
     case _ of
       Nothing -> pure null
@@ -113,8 +109,8 @@ callMarketPlaceFetchNft cfg args = Promise.fromAff do
 callMarketPlaceBuy
   :: ContractConfiguration -> BuyNftArgs -> Effect (Promise Unit)
 callMarketPlaceBuy cfg args = Promise.fromAff do
-  contractConfig <- liftBuilder $ buildContractConfig cfg
-  nftData <- liftBuilder $ buildNftData args
+  contractConfig <- liftEither $ buildContractConfig cfg
+  nftData <- liftEither $ buildNftData args
   runContract contractConfig (marketplaceBuy nftData)
 
 -- | Calls Seabugs marketPlaceListNft and takes care of converting data types.
@@ -122,7 +118,7 @@ callMarketPlaceBuy cfg args = Promise.fromAff do
 callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
-  contractConfig <- liftBuilder $ buildContractConfig cfg
+  contractConfig <- liftEither $ buildContractConfig cfg
   listnft <- runContract contractConfig (marketPlaceListNft cfg.projectId)
   pure $ buildNftList contractConfig.networkId <$> listnft
 
