@@ -5,11 +5,13 @@ on:
     branches: [master, staging]
   pull_request:
     branches: [master, staging]
+    types: [opened, reopened, synchronize, ready_for_review]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v2
       - uses: cachix/install-nix-action@v13
