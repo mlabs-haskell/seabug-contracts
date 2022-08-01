@@ -10,7 +10,7 @@ Use `spago test` to run the tests. Something like `nix build .#checks.<system>.s
 
 The minting process currently requires some manual steps. To mint a new NFT:
 
-- Upload a new image to nft.storage (e.g. using `seabug/scripts/mint-nft.sh`)
+- Upload a new image to nft.storage (e.g. using `seabug/scripts/mint-nft.sh`). [Pixabay](https://pixabay.com/photos/) is a good source of photos.
 - Uncomment [this line](https://github.com/mlabs-haskell/seabug-contracts/blob/cda88824f87e0b961b738c66a428b7ade77454be/index.js#L39)
 - Update the image info [here](https://github.com/mlabs-haskell/seabug-contracts/blob/cda88824f87e0b961b738c66a428b7ade77454be/src/Seabug/Seabug.purs#L34)
   - Make sure you're using the base36 encoded CID (`mint-nft.sh` prints this out)
