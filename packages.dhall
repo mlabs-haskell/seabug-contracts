@@ -362,11 +362,7 @@ let additions =
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
           -- should be same rev as in flake.nix
-          -- https://github.com/Plutonomicon/cardano-transaction-lib/pull/696
-          -- PR: Return error if no utxo is specified for a tx input & Fix transaction inputs locking
-          -- Commit is from our branch calum/metadata-invalid-char-fix which is based off this PR and
-          -- includes a small fix to get the build working. Also updated to include `awaitTxConfirmed`.
-        , version = "07bd6264f51741ab14ae57b39a081a084dcc7a0a"
+        , version = "6c018d43ddfef771bfd586e885ecb0cc7ebd8421"
         }
       }
 in upstream // additions

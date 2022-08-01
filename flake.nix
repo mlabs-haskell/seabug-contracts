@@ -12,8 +12,8 @@
       repo = "cardano-transaction-lib";
       # should be same rev as in packages.dhall
       # To update, do `spago2nix generate`
-      # calum/metadata-invalid-char-fix
-      rev = "07bd6264f51741ab14ae57b39a081a084dcc7a0a";
+      # `develop` branch
+      rev = "6c018d43ddfef771bfd586e885ecb0cc7ebd8421";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };
