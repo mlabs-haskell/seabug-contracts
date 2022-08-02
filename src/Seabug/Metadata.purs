@@ -8,6 +8,7 @@ module Seabug.Metadata
 
 import Contract.Prelude
 
+import Aeson (caseAeson, constAesonCases, decodeAeson, getNestedAeson)
 import Aeson as Aeson
 import Affjax (printError)
 import Affjax as Affjax
@@ -102,12 +103,21 @@ getIpfsHash
   -> BlockfrostFetch Hash
 getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
   r <- mkGetRequest ("assets/" <> mkAsset collectionNftCS collectionNftTN)
-  imageArray <- except $
-    ( decodeField "image" <=< decodeField tokenNameKey
-        <=< decodeField currSymKey
-        <=< decodeField "onchain_metadata"
-    ) r
-  except $ note (BlockfrostOtherError "Empty image array") $ head imageArray
+  imageAeson <- except $ lmap (BlockfrostOtherError <<< show) $
+    getNestedAeson r
+      [ "onchain_metadata", currSymKey, tokenNameKey, "image" ]
+  except $ lmap BlockfrostOtherError $ caseAeson
+    ( constAesonCases
+        ( Left "Could not parse image field as string or array"
+        ) # _
+        { caseArray =
+            ( lmap (const "Image array does not contain a string") <<<
+                decodeAeson
+            ) <=< note "Image field contains empty array" <<< head
+        , caseString = Right
+        }
+    )
+    imageAeson
   where
   currSymKey :: String
   currSymKey = metadataBytesString $ getCurrencySymbol collectionNftCS
