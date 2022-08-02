@@ -2,7 +2,9 @@ module Main (main) where
 
 import Contract.Prelude
 
-import Contract.Address (NetworkId(..), ownPaymentPubKeyHash)
+import Contract.Address (NetworkId(..), Slot(..), ownPaymentPubKeyHash)
+import Contract.Chain (waitNSlots)
+import Contract.Numeric.Natural as Nat
 import Contract.Test.Plutip (PlutipConfig, runPlutipContract, withKeyWallet)
 import Contract.Transaction (awaitTxConfirmed)
 import Data.BigInt (BigInt)
@@ -11,8 +13,10 @@ import Data.UInt as UInt
 import Effect.Aff (launchAff_)
 import Seabug.Contract.CnftMint (mintCnft)
 import Seabug.Contract.MarketPlaceListNft (marketPlaceListNft)
+import Seabug.Contract.Mint (mintWithCollection)
 import Seabug.Types (MintCnftParams(..))
 import Serialization.Address (addressBech32)
+import Types.BigNum as BigNum
 
 main :: Effect Unit
 main = launchAff_ $ do
@@ -27,6 +31,7 @@ main = launchAff_ $ do
     w <- liftAff $ unwrap alice # _.address $ MainnetId
     log $ show $ addressBech32 w
     withKeyWallet alice do
+      log "Minting cnft..."
       txHash /\ cnft <- mintCnft $
         MintCnftParams
           { imageUri:
@@ -35,12 +40,28 @@ main = launchAff_ $ do
           , name: "Piaggio Ape"
           , description: "Seabug Testing"
           }
+      log $ "Waiting for confirmation of cnft transaction: " <> show txHash
       awaitTxConfirmed txHash
-      log <<< show =<< marketPlaceListNft
-        "testnetu7qDM8q2XT1S6gEBSicUIqXB6QN60l7B"
-      pure unit -- sign, balance, submit, etc.
-    withKeyWallet bob do
-      log <<< show =<< ownPaymentPubKeyHash
+      log $ "Cnft transaction confirmed: " <> show txHash
+      log $ "Minted cnft: " <> show cnft
+      log "Minting sgNft..."
+      log "Waiting some slots..."
+      void $ waitNSlots (Nat.fromInt' 15)
+      log "Done waiting, back to minting..."
+      sgNftTxHash <- mintWithCollection cnft
+        $ wrap
+            { authorShare: Nat.fromInt' 1000
+            , daoShare: Nat.fromInt' 1000
+            , price: Nat.fromInt' $ 100 * 1000000
+            , lockLockup: BigInt.fromInt 5
+            , lockLockupEnd: Slot $ BigNum.fromInt 5
+            , feeVaultKeys: []
+            }
+      log $ "Waiting for confirmation of nft transaction: " <> show sgNftTxHash
+      awaitTxConfirmed sgNftTxHash
+      log $ "Nft transaction confirmed: " <> show sgNftTxHash
+      -- log <<< show =<< marketPlaceListNft
+      --   "testnetu7qDM8q2XT1S6gEBSicUIqXB6QN60l7B"
       pure unit -- sign, balance, submit, etc.
 
 config :: PlutipConfig
