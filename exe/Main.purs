@@ -2,30 +2,35 @@ module Main (main) where
 
 import Contract.Prelude
 
-import Contract.Address (NetworkId(..), Slot(..), ownPaymentPubKeyHash)
+import Contract.Address (NetworkId(..), Slot(..))
 import Contract.Chain (waitNSlots)
 import Contract.Numeric.Natural as Nat
-import Contract.Test.Plutip (PlutipConfig, runPlutipContract, withKeyWallet)
+import Contract.Test.Plutip (PlutipConfig, InitialUTxO, runPlutipContract, withKeyWallet, withStakeKey)
 import Contract.Transaction (awaitTxConfirmed)
-import Data.BigInt (BigInt)
+import Contract.Wallet (privateKeyFromBytes)
 import Data.BigInt as BigInt
 import Data.UInt as UInt
-import Effect.Aff (launchAff_)
+import Effect.Aff (error, launchAff_)
 import Seabug.Contract.CnftMint (mintCnft)
-import Seabug.Contract.MarketPlaceListNft (marketPlaceListNft)
 import Seabug.Contract.Mint (mintWithCollection)
 import Seabug.Types (MintCnftParams(..))
 import Serialization.Address (addressBech32)
 import Types.BigNum as BigNum
+import Types.RawBytes (hexToRawBytes)
 
 main :: Effect Unit
 main = launchAff_ $ do
+  privateStakeKey <- liftM (error "Failed to parse private stake key")
+    $ privateKeyFromBytes
+    =<< hexToRawBytes
+        "633b1c4c4a075a538d37e062c1ed0706d3f0a94b013708e8f5ab0a0ca1df163d"
   let
-    distribution :: Array BigInt /\ Array BigInt
     distribution =
-      [ BigInt.fromInt 1_000_000_000
-      , BigInt.fromInt 2_000_000_000
-      ] /\
+      ( withStakeKey (wrap privateStakeKey)
+          [ BigInt.fromInt 1_000_000_000
+          , BigInt.fromInt 2_000_000_000
+          ]
+      ) /\
         [ BigInt.fromInt 2_000_000_000 ]
   runPlutipContract config distribution \(alice /\ bob) -> do
     w <- liftAff $ unwrap alice # _.address $ MainnetId
@@ -45,8 +50,8 @@ main = launchAff_ $ do
       log $ "Cnft transaction confirmed: " <> show txHash
       log $ "Minted cnft: " <> show cnft
       log "Minting sgNft..."
-      log "Waiting some slots..."
-      void $ waitNSlots (Nat.fromInt' 15)
+      -- log "Waiting some slots..."
+      -- void $ waitNSlots (Nat.fromInt' 15)
       log "Done waiting, back to minting..."
       sgNftTxHash <- mintWithCollection cnft
         $ wrap
