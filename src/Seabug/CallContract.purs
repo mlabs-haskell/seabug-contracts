@@ -1,5 +1,6 @@
 module Seabug.CallContract
-  ( callMarketPlaceBuy
+  ( callGetWalletBalance
+  , callMarketPlaceBuy
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
   , callMint
@@ -8,13 +9,8 @@ module Seabug.CallContract
 import Contract.Prelude hiding (null)
 
 import Contract.Address (Slot(Slot))
-import Contract.Monad
-  ( ConfigParams(ConfigParams)
-  , ContractConfig
-  , mkContractConfig
-  , runContract
-  , runContract_
-  )
+import Contract.Config (WalletSpec(..), ConfigParams)
+import Contract.Monad (runContract)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
 import Contract.Transaction
@@ -22,6 +18,7 @@ import Contract.Transaction
   , TransactionOutput(TransactionOutput)
   , awaitTxConfirmed
   )
+import Contract.Utxos (getWalletBalance)
 import Contract.Value
   ( CurrencySymbol
   , TokenName
@@ -38,12 +35,11 @@ import Control.Promise as Promise
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Data.Log.Level (LogLevel(..))
-import Data.Nullable (Nullable, notNull, null)
+import Data.Nullable (Nullable, notNull, null, toNullable)
 import Data.Tuple.Nested ((/\))
 import Data.UInt as UInt
 import Effect (Effect)
 import Effect.Aff (error)
-import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import Partial.Unsafe (unsafePartial)
 import Plutus.Conversion (fromPlutusAddress)
@@ -71,12 +67,17 @@ import Serialization.Hash
   )
 import Types.BigNum as BigNum
 import Types.Natural as Nat
-import Wallet (mkNamiWalletAff)
+
+callGetWalletBalance
+  :: ContractConfiguration -> Effect (Promise (Nullable Value))
+callGetWalletBalance cfg = Promise.fromAff do
+  contractConfig <- liftEither $ buildContractConfig cfg
+  toNullable <$> runContract contractConfig getWalletBalance
 
 callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do
-  contractConfig <- buildContractConfig cfg
-  mintCnftParams /\ mintParams <- liftEffect $ liftEither $ buildMintArgs args
+  contractConfig <- liftEither $ buildContractConfig cfg
+  mintCnftParams /\ mintParams <- liftEither $ buildMintArgs args
   runContract contractConfig $ do
     log "Minting cnft..."
     txHash /\ cnft <- mintCnft mintCnftParams
@@ -95,30 +96,31 @@ callMarketPlaceFetchNft
   -> TransactionInputOut
   -> Effect (Promise (Nullable ListNftResultOut))
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
-  contractConfig <- buildContractConfig cfg
-  txInput <- liftEffect $ liftEither $ buildTransactionInput args
-  runContract contractConfig (marketPlaceFetchNft txInput) >>= case _ of
-    Nothing -> pure null
-    Just nftResult -> pure $ notNull $
-      buildNftList (unwrap contractConfig).networkId nftResult
+  contractConfig <- liftEither $ buildContractConfig cfg
+  txInput <- liftEither $ buildTransactionInput args
+  runContract contractConfig (marketPlaceFetchNft cfg.projectId txInput) >>=
+    case _ of
+      Nothing -> pure null
+      Just nftResult -> pure $ notNull $
+        buildNftList contractConfig.networkId nftResult
 
 -- | Calls Seabugs marketplaceBuy and takes care of converting data types.
 -- | Returns a JS promise holding no data.
 callMarketPlaceBuy
   :: ContractConfiguration -> BuyNftArgs -> Effect (Promise Unit)
 callMarketPlaceBuy cfg args = Promise.fromAff do
-  contractConfig <- buildContractConfig cfg
-  nftData <- liftEffect $ liftEither $ buildNftData args
-  runContract_ contractConfig (marketplaceBuy nftData)
+  contractConfig <- liftEither $ buildContractConfig cfg
+  nftData <- liftEither $ buildNftData args
+  runContract contractConfig (marketplaceBuy nftData)
 
 -- | Calls Seabugs marketPlaceListNft and takes care of converting data types.
 -- | Returns a JS promise holding nft listings.
 callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
-  contractConfig <- buildContractConfig cfg
-  listnft <- runContract contractConfig marketPlaceListNft
-  pure $ buildNftList (unwrap contractConfig).networkId <$> listnft
+  contractConfig <- liftEither $ buildContractConfig cfg
+  listnft <- runContract contractConfig (marketPlaceListNft cfg.projectId)
+  pure $ buildNftList contractConfig.networkId <$> listnft
 
 -- | Configuation needed to call contracts from JS.
 type ContractConfiguration =
@@ -189,40 +191,43 @@ type MintArgs =
   }
 
 buildContractConfig
-  :: ContractConfiguration -> Aff (ContractConfig (projectId :: String))
+  :: ContractConfiguration -> Either Error (ConfigParams ())
 buildContractConfig cfg = do
-  serverPort <- liftM (error "Invalid server port number")
+  serverPort <- note (error "Invalid server port number")
     $ UInt.fromInt' cfg.serverPort
-  ogmiosPort <- liftM (error "Invalid ogmios port number")
+  ogmiosPort <- note (error "Invalid ogmios port number")
     $ UInt.fromInt' cfg.ogmiosPort
-  datumCachePort <- liftM (error "Invalid datum cache port number")
+  datumCachePort <- note (error "Invalid datum cache port number")
     $ UInt.fromInt' cfg.datumCachePort
-  networkId <- liftM (error "Invalid network id")
+  networkId <- note (error "Invalid network id")
     $ intToNetworkId cfg.networkId
-  logLevel <- liftM (error "Invalid log level")
+  logLevel <- note (error "Invalid log level")
     $ stringToLogLevel cfg.logLevel
 
-  wallet <- Just <$> mkNamiWalletAff
-  mkContractConfig $ ConfigParams
+  pure
     { ogmiosConfig:
         { port: ogmiosPort
         , host: cfg.ogmiosHost
         , secure: cfg.ogmiosSecureConn
+        , path: Nothing
         }
     , datumCacheConfig:
         { port: datumCachePort
         , host: cfg.datumCacheHost
         , secure: cfg.datumCacheSecureConn
+        , path: Nothing
         }
     , ctlServerConfig:
         { port: serverPort
         , host: cfg.serverHost
         , secure: cfg.serverSecureConn
+        , path: Nothing
         }
     , networkId: networkId
     , logLevel: logLevel
-    , extraConfig: { projectId: cfg.projectId }
-    , wallet
+    , extraConfig: {}
+    , walletSpec: Just ConnectToNami
+    , customLogger: Nothing
     }
 
 stringToLogLevel :: String -> Maybe LogLevel

@@ -25,8 +25,8 @@ import Contract.Value
   )
 import Data.Array (head)
 import Data.Map as Map
-import Data.NonEmpty as NonEmpty
-import Metadata.Cip25 (Cip25Metadata(..), Cip25MetadataEntry(..))
+import Metadata.Cip25.Cip25String (mkCip25String)
+import Metadata.Cip25.V2 (Cip25Metadata(..), Cip25MetadataEntry(..))
 import Seabug.CnftMintPolicy (mkCnftMintingPolicy)
 import Seabug.Types (MintCnftParams(..))
 
@@ -69,13 +69,16 @@ mintCnft (MintCnftParams params) = do
   unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
   policyHash <- liftedM "Could not get minting policy hash" $ liftAff $
     mintingPolicyHash policy
+  name <- liftContractM "Invalid CIP25 NFT name. The name is probably too long."
+    $ mkCip25String params.name
   unbalancedTxWithMetadata <- setTxMetadata unbalancedTx $ Cip25Metadata
     [ Cip25MetadataEntry
         { policyId: policyHash
-        , assetName: tn
-        , imageUris: NonEmpty.singleton params.imageUri
+        , assetName: wrap tn
+        , name
+        , image: params.imageUri
         , mediaType: Nothing
-        , description: [ params.name, params.description ]
+        , description: Just params.description
         , files: []
         }
     ]

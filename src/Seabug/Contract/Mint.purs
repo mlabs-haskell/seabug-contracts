@@ -3,18 +3,17 @@ module Seabug.Contract.Mint where
 import Contract.Prelude
 
 import Contract.Address
-  ( Slot
-  , getNetworkId
+  ( getNetworkId
   , ownPaymentPubKeyHash
   , ownStakePubKeyHash
   , payPubKeyHashBaseAddress
   )
-import Contract.Chain (ChainTip(..), Tip(..), getTip)
+import Contract.Chain (currentSlot, currentTime)
 import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
 import Contract.PlutusData (toData)
 import Contract.ScriptLookups as Lookups
 import Contract.Scripts (validatorHash)
-import Contract.Time (from, getEraSummaries, getSystemStart, slotToPosixTime)
+import Contract.Time (from)
 import Contract.Transaction (TransactionHash, balanceAndSignTxE, submit)
 import Contract.TxConstraints as Constraints
 import Contract.Utxos (utxosAt)
@@ -37,13 +36,6 @@ import Seabug.Types
   , NftData(..)
   , NftId(..)
   )
-import Types.BigNum as BigNum
-
--- | TODO: Use `currentSlot` instead, see
--- | https://github.com/mlabs-haskell/seabug-contracts/issues/27
-slotFromTip :: Tip -> Slot
-slotFromTip TipAtGenesis = wrap $ BigNum.zero
-slotFromTip (Tip (ChainTip { slot })) = slot
 
 -- | Mint the self-governed NFT for the given collection.
 mintWithCollection
@@ -62,7 +54,6 @@ mintWithCollection
   addr <- liftContractM "Cannot get user address" $
     payPubKeyHashBaseAddress networkId owner ownerStake
   utxos <- liftedM "Cannot get user utxos" $ utxosAt addr
-  currentSlot <- slotFromTip <$> getTip
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
   lockingScript <- liftedE $ mkLockScript collectionNftCs lockLockup
     lockLockupEnd
@@ -84,10 +75,8 @@ mintWithCollection
   curr <- liftedM "Could not get currency symbol" $ liftAff $
     scriptCurrencySymbol policy
   tn <- liftedM "Could not get token name" $ MintingPolicy.mkTokenName nft
-  eraSummaries <- getEraSummaries
-  systemStart <- getSystemStart
-  now <- liftedE $ liftAff $ liftEffect $
-    slotToPosixTime eraSummaries systemStart currentSlot
+  entered <- currentSlot
+  now <- currentTime
   let
     nftValue = singleton curr tn one
     lookups = mconcat
@@ -105,7 +94,7 @@ mintWithCollection
       , Constraints.mustPayToScript lockingScriptHash
           ( wrap $ toData $ LockDatum
               { sgNft: curr
-              , entered: currentSlot
+              , entered
               , underlyingTn: collectionNftTn
               }
           ) $ singleton collectionNftCs collectionNftTn one

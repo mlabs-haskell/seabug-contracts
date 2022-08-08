@@ -14,7 +14,6 @@ import Contract.Utxos (utxosAt)
 import Contract.Value (valueOf)
 import Control.Alternative (guard)
 import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
-import Control.Monad.Reader (asks)
 import Control.Parallel (parTraverse)
 import Data.Array (catMaybes, mapMaybe)
 import Data.Map as Map
@@ -29,11 +28,11 @@ import Seabug.Types (MarketplaceDatum(MarketplaceDatum))
 -- | on matching `CurrencySymbol` and `TokenName`.
 marketPlaceListNft
   :: forall (r :: Row Type)
-   . Contract (projectId :: String | r) (Array NftResult)
-marketPlaceListNft = do
+   . String
+  -> Contract r (Array NftResult)
+marketPlaceListNft projectId = do
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
   networkId <- getNetworkId
-  projectId <- asks $ unwrap >>> _.projectId
   scriptAddr <-
     liftContractM "marketPlaceListNft: Cannot convert validator hash to address"
       $ typedValidatorEnterpriseAddress networkId
