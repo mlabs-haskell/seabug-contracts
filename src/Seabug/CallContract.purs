@@ -1,5 +1,6 @@
 module Seabug.CallContract
-  ( callGetWalletBalance
+  ( callConnectWallet
+  , callGetWalletBalance
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
@@ -30,6 +31,7 @@ import Contract.Value
   , mkCurrencySymbol
   , mkTokenName
   )
+import Control.Monad.Error.Class (throwError)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.BigInt (BigInt)
@@ -67,6 +69,16 @@ import Serialization.Hash
   )
 import Types.BigNum as BigNum
 import Types.Natural as Nat
+import Wallet (Wallet, mkNamiWalletAff, mkGeroWalletAff)
+
+callConnectWallet
+  :: forall (r :: Row Type)
+   . String
+  -> Effect (Promise Wallet)
+callConnectWallet walletOption = case walletOption of
+  "Nami" -> Promise.fromAff mkNamiWalletAff
+  "Gero" -> Promise.fromAff mkGeroWalletAff
+  _ -> throwError <<< error $ "Unsupported wallet"
 
 callGetWalletBalance
   :: ContractConfiguration -> Effect (Promise (Nullable Value))

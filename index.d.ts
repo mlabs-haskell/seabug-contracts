@@ -9,7 +9,7 @@ export function callMarketPlaceListNft(config: Config):
  */
 export function callMarketPlaceFetchNft(config: Config, args: FetchNftArgs):
     Promise<NftListing?>
-export function connectWallet(): Promise<any>
+export function connectWallet(walletOption: string): Promise<any>
 export function getWalletBalance(config: Config): Promise<any>
 
 export type NetworkId

@@ -32,6 +32,14 @@ exports.callMarketPlaceFetchNft = async (config, args) => {
   return sb.callMarketPlaceFetchNft(config)(args)();
 };
 
+/**
+ * Connects to Nami or Gero wallet.
+ * Returns a promise holding the Wallet object.
+ */
+exports.connectWallet = async (walletOption) => {
+  const sb = await seabug;
+  return sb.callConnectWallet(walletOption)();
+};
 
 /**
  * Returns a promise containing the connected wallet's balance.
