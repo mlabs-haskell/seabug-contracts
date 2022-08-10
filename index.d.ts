@@ -9,8 +9,10 @@ export function callMarketPlaceListNft(config: Config):
  */
 export function callMarketPlaceFetchNft(config: Config, args: FetchNftArgs):
     Promise<NftListing?>
-export function connectWallet(walletOption: string): Promise<any>
+export function connectWallet(walletOption: WalletOption): Promise<any>
 export function getWalletBalance(config: Config): Promise<any>
+
+export type WalletOption = "Nami" | "Gero";
 
 export type NetworkId
     = 0 // Testnet

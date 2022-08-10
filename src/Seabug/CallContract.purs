@@ -78,7 +78,7 @@ callConnectWallet
 callConnectWallet walletOption = case walletOption of
   "Nami" -> Promise.fromAff mkNamiWalletAff
   "Gero" -> Promise.fromAff mkGeroWalletAff
-  _ -> throwError <<< error $ "Unsupported wallet"
+  _ -> throwError <<< error $ "Unsupported wallet: " <> walletOption
 
 callGetWalletBalance
   :: ContractConfiguration -> Effect (Promise (Nullable Value))
