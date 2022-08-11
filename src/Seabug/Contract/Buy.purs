@@ -48,7 +48,7 @@ mkBuyTxData nftData mScriptUtxos = do
     nftData' = unwrap nftData
     nftCollection = unwrap nftData'.nftCollection
     nftId = unwrap nftData'.nftId
-    nftPrice = (unwrap txData.newNft).price
+    nftPrice = nftId.price
 
     getShare :: BigInt -> BigInt
     getShare share = (toBigInt nftPrice * share) `div` fromInt maxShare
