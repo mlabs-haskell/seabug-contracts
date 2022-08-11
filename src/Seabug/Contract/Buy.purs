@@ -82,7 +82,7 @@ mkBuyTxData nftData mScriptUtxos = do
           (mustPayWithDatumToPubKey nftCollection.author datum)
         <> filterLowValue
           ownerShare
-          (mustPayWithDatumToPubKey oldOwner datum)
+          (mustPayWithDatumToPubKey nftId.owner datum)
         <> txData.constraints
 
   pure $ txData { constraints = constraints }

@@ -30,9 +30,8 @@ mint = callMint
   , projectId: "testnetu7qDM8q2XT1S6gEBSicUIqXB6QN60l7B"
   , logLevel: "Trace"
   }
-  { -- base36 ipfs cid obtained from mint-nft.sh
-    imageUri: "ipfs://k2cwuebwvb6kdiwob6sb2yqnz38r0yv72q1xijbts9ep5lq3nm8rw3i4"
   { -- base36 ipfs cid obtained from upload-image.sh
+    imageUri: "ipfs://k2cwuebwvb6kdiwob6sb2yqnz38r0yv72q1xijbts9ep5lq3nm8rw3i4"
   , tokenNameString: "abcdef"
   , name: "Piaggio Ape"
   , description: "Seabug Testing"
