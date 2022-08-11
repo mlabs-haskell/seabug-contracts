@@ -47,7 +47,14 @@ import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
 import Plutus.Types.Transaction (UtxoM)
-import Seabug.Contract.Util (minAdaOnlyUTxOValue, seabugTxToMarketTx)
+import Seabug.Contract.Util
+  ( SeabugTxData
+  , ReturnBehaviour(ToCaller)
+  , minAdaOnlyUTxOValue
+  , seabugTxToMarketTx
+  , mkChangeNftIdTxData
+  , modify
+  )
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.Metadata.Share (maxShare)
 import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
@@ -69,7 +76,7 @@ mkBuyTxData nftData mScriptUtxos = do
   pkh <- liftedM "buy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
 
-  txData <- mkChangeNftIdTxData "buy" (ChangeOwner _ pkh)
+  txData <- mkChangeNftIdTxData "buy" (flip ChangeOwner pkh)
     (modify $ _ { owner = pkh })
     nftData
     mScriptUtxos
@@ -98,7 +105,7 @@ mkBuyTxData nftData mScriptUtxos = do
     ownerShare = toBigInt nftPrice
       - shareToSubtract authorShare
       - shareToSubtract daoShare
-    datum = Datum $ toData $ curr /\ oldName
+    datum = Datum $ toData txData.oldAsset
 
     constraints =
       filterLowValue
@@ -115,4 +122,4 @@ mkBuyTxData nftData mScriptUtxos = do
   pure $ txData { constraints = constraints }
 
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
-marketplaceBuy = seabugTxToMarketTx "marketplaceBuy" mkBuyTxData
+marketplaceBuy = seabugTxToMarketTx "marketplaceBuy" ToCaller mkBuyTxData

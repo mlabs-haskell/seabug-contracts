@@ -1,27 +1,82 @@
 module Seabug.Contract.Util
   ( SeabugTxData
+  , ReturnBehaviour(..)
   , minAdaOnlyUTxOValue
-  , seabugTxToMarketTx
   , mkChangeNftIdTxData
+  , modify
+  , seabugTxToMarketTx
   , setSeabugMetadata
   ) where
 
 import Contract.Prelude
 
+import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
 import Contract.AuxiliaryData (setTxMetadata)
-import Contract.Monad (Contract, liftContractM)
+import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
 import Contract.Numeric.Natural (toBigInt)
-import Contract.ScriptLookups (UnattachedUnbalancedTx)
-import Contract.Value (CurrencySymbol)
+import Contract.PlutusData
+  ( Datum(Datum)
+  , Redeemer(Redeemer)
+  , toData
+  , unitRedeemer
+  )
+import Contract.ScriptLookups
+  ( ScriptLookups
+  , UnattachedUnbalancedTx
+  , mkUnbalancedTx
+  )
+import Contract.ScriptLookups
+  ( mintingPolicy
+  , ownPaymentPubKeyHash
+  , typedValidatorLookups
+  , unspentOutputs
+  , validator
+  ) as ScriptLookups
+import Contract.Scripts (typedValidatorEnterpriseAddress)
+import Contract.Transaction
+  ( TransactionOutput(TransactionOutput)
+  , balanceAndSignTxE
+  , submit
+  )
+import Contract.TxConstraints
+  ( TxConstraint
+  , TxConstraints
+  , mustMintValueWithRedeemer
+  , mustPayToPubKeyAddress
+  , mustPayToScript
+  , mustPayWithDatumToPubKey
+  , mustSpendScriptOutput
+  )
+import Contract.Utxos (utxosAt)
+import Contract.Value (TokenName, CurrencySymbol)
+import Contract.Value as Value
+import Contract.Wallet (getWalletAddress)
+import Data.Array (find) as Array
+import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt)
+import Data.BigInt (BigInt, fromInt)
 import Data.BigInt as BigInt
+import Data.Map (insert, toUnfoldable)
+import Plutus.Types.Transaction (UtxoM)
+import Seabug.MarketPlace (marketplaceValidator)
+import Seabug.Metadata.Share (maxShare)
 import Seabug.Metadata.Share (mkShare)
 import Seabug.Metadata.Types (SeabugMetadata(..))
+import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
+import Seabug.Types
+  ( MarketplaceDatum(MarketplaceDatum)
+  , MintAct(ChangeOwner)
+  , NftData(..)
+  , NftId(NftId)
+  )
 import Seabug.Types (NftData(..))
+import Serialization.Types (PlutusData)
+import Types.Transaction (TransactionInput)
 
 type SeabugTxData =
   { constraints :: TxConstraints Unit Unit
   , lookups :: ScriptLookups PlutusData
+  , oldAsset :: Value.CurrencySymbol /\ Value.TokenName
   , newAsset :: Value.CurrencySymbol /\ Value.TokenName
   , inputUtxo :: TransactionInput
   , newNft :: NftId
@@ -31,14 +86,18 @@ type SeabugTxData =
 modify :: forall t a. Newtype t a => (a -> a) -> t -> t
 modify fn t = wrap (fn (unwrap t))
 
+data ReturnBehaviour = ToMarketPlace | ToCaller
+
 seabugTxToMarketTx
   :: forall (r :: Row Type)
    . String
+  -> ReturnBehaviour
   -> (NftData -> Maybe UtxoM -> Contract r SeabugTxData)
   -> NftData
   -> Contract r Unit
-seabugTxToMarketTx name nftData mkTxData = do
+seabugTxToMarketTx name retBehaviour mkTxData nftData = do
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
+  addr <- liftedM "Couldn't get own address" getWalletAddress
   networkId <- getNetworkId
   scriptAddr <-
     liftContractM (name <> ": Cannot convert validator hash to address")
@@ -56,15 +115,18 @@ seabugTxToMarketTx name nftData mkTxData = do
       ]
     newNftValue = Value.singleton (fst txData.newAsset) (snd txData.newAsset)
       one
-    constraints = txData.constraints <> mconcat
-      [ mustSpendScriptOutput txData.inputUtxo unitRedeemer
-      , mustPayToScript
-          valHash
-          ( Datum $ toData $
-              MarketplaceDatum { getMarketplaceDatum: txData.newAsset }
-          )
-          newNftValue
-      ]
+    constraints = txData.constraints
+      <> mustSpendScriptOutput txData.inputUtxo unitRedeemer
+      <>
+        case retBehaviour of
+          ToMarketPlace ->
+            mustPayToScript
+              valHash
+              ( Datum $ toData $
+                  MarketplaceDatum { getMarketplaceDatum: txData.newAsset }
+              )
+              newNftValue
+          ToCaller -> mempty -- Balancing will return the token to the caller
 
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookups constraints
   txWithMetadata <-
@@ -104,10 +166,10 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
     $ liftAff
     $ Value.scriptCurrencySymbol policy
 
-  networkId <- getNetworkId
   let
     newNft = mapNft nftData.nftId
-  oldName <- liftedM (name <> ": Cannot hash old token") $ mkTokenName nft
+  oldName <- liftedM (name <> ": Cannot hash old token") $ mkTokenName
+    nftData.nftId
   newName <- liftedM (name <> ": Cannot hash new token")
     $ mkTokenName newNft
   let
@@ -127,7 +189,7 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
       $ Array.find containsNft
       $ toUnfoldable
       $ unwrap
-      $ fromMaybe userUtxos scriptUtxos
+      $ fromMaybe userUtxos mScriptUtxos
   let
     utxosForTx = insert utxo utxoIndex $ unwrap userUtxos
     lookups = mconcat
@@ -141,6 +203,7 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
   pure
     { constraints: constraints
     , lookups: lookups
+    , oldAsset: curr /\ oldName
     , newAsset: curr /\ newName
     , inputUtxo: utxo
     , newNft: newNft

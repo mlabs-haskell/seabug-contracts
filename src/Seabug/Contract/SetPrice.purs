@@ -5,7 +5,7 @@ import Contract.Prelude
 import Cardano.Types.Value (CurrencySymbol)
 import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
 import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
-import Contract.Numeric.Natural (toBigInt)
+import Contract.Numeric.Natural (Natural, toBigInt)
 import Contract.PlutusData
   ( Datum(Datum)
   , Redeemer(Redeemer)
@@ -19,10 +19,10 @@ import Contract.ScriptLookups
   )
 import Contract.ScriptLookups
   ( mintingPolicy
-  , validator
   , ownPaymentPubKeyHash
   , typedValidatorLookups
   , unspentOutputs
+  , validator
   ) as ScriptLookups
 import Contract.Scripts (typedValidatorEnterpriseAddress)
 import Contract.Transaction
@@ -47,13 +47,21 @@ import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
 import Plutus.Types.Transaction (UtxoM)
-import Seabug.Contract.Util (minAdaOnlyUTxOValue, setSeabugMetadata)
+import Seabug.Contract.Util
+  ( SeabugTxData
+  , ReturnBehaviour(ToMarketPlace)
+  , minAdaOnlyUTxOValue
+  , mkChangeNftIdTxData
+  , modify
+  , setSeabugMetadata
+  , seabugTxToMarketTx
+  )
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.Metadata.Share (maxShare)
 import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
   ( MarketplaceDatum(MarketplaceDatum)
-  , MintAct(ChangeOwner)
+  , MintAct(ChangePrice)
   , NftData(..)
   , NftId(NftId)
   )
@@ -67,8 +75,10 @@ mkSetPriceTxData
   -> Maybe UtxoM
   -> Contract r SeabugTxData
 mkSetPriceTxData newPrice =
-  mkChangeNftIdTxData "setPrice" (ChangePrice _ newPrice) $ modify $ _
+  mkChangeNftIdTxData "setPrice" (flip ChangePrice newPrice) $ modify $ _
     { price = newPrice }
 
-marketplaceSetPrice :: forall (r :: Row Type). NftData -> Contract r Unit
-marketplaceSetPrice = seabugTxToMarketTx "marketplaceSetPrice" mkSetPriceTxData
+marketplaceSetPrice
+  :: forall (r :: Row Type). Natural -> NftData -> Contract r Unit
+marketplaceSetPrice = seabugTxToMarketTx "marketplaceSetPrice" ToMarketPlace <<<
+  mkSetPriceTxData
