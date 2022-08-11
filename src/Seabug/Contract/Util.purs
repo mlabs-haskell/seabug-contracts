@@ -10,7 +10,7 @@ module Seabug.Contract.Util
 
 import Contract.Prelude
 
-import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
+import Contract.Address (getNetworkId)
 import Contract.AuxiliaryData (setTxMetadata)
 import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
 import Contract.Numeric.Natural (toBigInt)
@@ -27,7 +27,6 @@ import Contract.ScriptLookups
   )
 import Contract.ScriptLookups
   ( mintingPolicy
-  , ownPaymentPubKeyHash
   , typedValidatorLookups
   , unspentOutputs
   , validator
@@ -39,37 +38,31 @@ import Contract.Transaction
   , submit
   )
 import Contract.TxConstraints
-  ( TxConstraint
-  , TxConstraints
+  ( TxConstraints
   , mustMintValueWithRedeemer
-  , mustPayToPubKeyAddress
   , mustPayToScript
-  , mustPayWithDatumToPubKey
   , mustSpendScriptOutput
   )
 import Contract.Utxos (utxosAt)
-import Contract.Value (TokenName, CurrencySymbol)
+import Contract.Value (CurrencySymbol)
 import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
 import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt)
-import Data.BigInt (BigInt, fromInt)
 import Data.BigInt as BigInt
 import Data.Map (insert, toUnfoldable)
 import Plutus.Types.Transaction (UtxoM)
 import Seabug.MarketPlace (marketplaceValidator)
-import Seabug.Metadata.Share (maxShare)
 import Seabug.Metadata.Share (mkShare)
 import Seabug.Metadata.Types (SeabugMetadata(..))
 import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
   ( MarketplaceDatum(MarketplaceDatum)
-  , MintAct(ChangeOwner)
+  , MintAct
   , NftData(..)
-  , NftId(NftId)
+  , NftId
   )
-import Seabug.Types (NftData(..))
 import Serialization.Types (PlutusData)
 import Types.Transaction (TransactionInput)
 
@@ -97,7 +90,6 @@ seabugTxToMarketTx
   -> Contract r Unit
 seabugTxToMarketTx name retBehaviour mkTxData nftData = do
   marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
-  addr <- liftedM "Couldn't get own address" getWalletAddress
   networkId <- getNetworkId
   scriptAddr <-
     liftContractM (name <> ": Cannot convert validator hash to address")

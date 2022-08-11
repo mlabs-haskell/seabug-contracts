@@ -2,71 +2,20 @@ module Seabug.Contract.SetPrice where
 
 import Contract.Prelude
 
-import Cardano.Types.Value (CurrencySymbol)
-import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
-import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
-import Contract.Numeric.Natural (Natural, toBigInt)
-import Contract.PlutusData
-  ( Datum(Datum)
-  , Redeemer(Redeemer)
-  , toData
-  , unitRedeemer
-  )
-import Contract.ScriptLookups
-  ( ScriptLookups
-  , UnattachedUnbalancedTx
-  , mkUnbalancedTx
-  )
-import Contract.ScriptLookups
-  ( mintingPolicy
-  , ownPaymentPubKeyHash
-  , typedValidatorLookups
-  , unspentOutputs
-  , validator
-  ) as ScriptLookups
-import Contract.Scripts (typedValidatorEnterpriseAddress)
-import Contract.Transaction
-  ( TransactionOutput(TransactionOutput)
-  , balanceAndSignTxE
-  , submit
-  )
-import Contract.TxConstraints
-  ( TxConstraint
-  , TxConstraints
-  , mustMintValueWithRedeemer
-  , mustPayToScript
-  , mustPayWithDatumToPubKey
-  , mustSpendScriptOutput
-  )
-import Contract.Utxos (utxosAt)
-import Contract.Value (TokenName)
-import Contract.Value as Value
-import Contract.Wallet (getWalletAddress)
-import Data.Array (find) as Array
-import Data.Bifunctor (lmap)
-import Data.BigInt (BigInt, fromInt)
-import Data.Map (insert, toUnfoldable)
+import Contract.Monad (Contract)
+import Contract.Numeric.Natural (Natural)
 import Plutus.Types.Transaction (UtxoM)
 import Seabug.Contract.Util
   ( SeabugTxData
   , ReturnBehaviour(ToMarketPlace)
-  , minAdaOnlyUTxOValue
   , mkChangeNftIdTxData
   , modify
-  , setSeabugMetadata
   , seabugTxToMarketTx
   )
-import Seabug.MarketPlace (marketplaceValidator)
-import Seabug.Metadata.Share (maxShare)
-import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
-  ( MarketplaceDatum(MarketplaceDatum)
-  , MintAct(ChangePrice)
-  , NftData(..)
-  , NftId(NftId)
+  ( MintAct(ChangePrice)
+  , NftData
   )
-import Serialization.Types (PlutusData)
-import Types.Transaction (TransactionInput)
 
 mkSetPriceTxData
   :: forall (r :: Row Type)
