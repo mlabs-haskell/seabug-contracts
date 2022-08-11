@@ -32,6 +32,7 @@ mint = callMint
   }
   { -- base36 ipfs cid obtained from mint-nft.sh
     imageUri: "ipfs://k2cwuebwvb6kdiwob6sb2yqnz38r0yv72q1xijbts9ep5lq3nm8rw3i4"
+  { -- base36 ipfs cid obtained from upload-image.sh
   , tokenNameString: "abcdef"
   , name: "Piaggio Ape"
   , description: "Seabug Testing"

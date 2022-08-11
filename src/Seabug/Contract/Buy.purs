@@ -45,7 +45,9 @@ mkBuyTxData nftData mScriptUtxos = do
     nftData
     mScriptUtxos
   let
-    nftCollection = unwrap (unwrap nftData).nftCollection
+    nftData' = unwrap nftData
+    nftCollection = unwrap nftData'.nftCollection
+    nftId = unwrap nftData'.nftId
     nftPrice = (unwrap txData.newNft).price
 
     getShare :: BigInt -> BigInt
@@ -80,7 +82,7 @@ mkBuyTxData nftData mScriptUtxos = do
           (mustPayWithDatumToPubKey nftCollection.author datum)
         <> filterLowValue
           ownerShare
-          (mustPayWithDatumToPubKey pkh datum)
+          (mustPayWithDatumToPubKey oldOwner datum)
         <> txData.constraints
 
   pure $ txData { constraints = constraints }

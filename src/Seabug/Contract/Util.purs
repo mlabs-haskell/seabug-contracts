@@ -158,10 +158,9 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
     $ liftAff
     $ Value.scriptCurrencySymbol policy
 
-  let
-    newNft = mapNft nftData.nftId
-  oldName <- liftedM (name <> ": Cannot hash old token") $ mkTokenName
-    nftData.nftId
+  let newNft = mapNft nftData.nftId
+  oldName <- liftedM (name <> ": Cannot hash old token")
+    $ mkTokenName nftData.nftId
   newName <- liftedM (name <> ": Cannot hash new token")
     $ mkTokenName newNft
   let
