@@ -4,7 +4,11 @@ A library for interacting with Seabug smart contracts via the Cardano Transactio
 
 ## Tests
 
-Use `spago test` to run the tests. Something like `nix build .#checks.<system>.seabug-contracts` can also be used, where `<system>` is something like `x86_64-linux`.
+Use `spago test` to run the tests. Something like `nix build .#checks.<system>.seabug-contracts-unit-test` can also be used, where `<system>` is something like `x86_64-linux`.
+
+### Plutip Tests
+
+These need a special environment and so are separated into their own suite. Use `spago test --main Test.Plutip` to the plutip tests. Something like `nix build .#checks.<system>.seabug-contracts-plutip-test` can also be used.
 
 ## Minting
 

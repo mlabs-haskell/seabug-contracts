@@ -1,4 +1,4 @@
-module Test.Minting (suite) where
+module Test.Contract.Minting (suite) where
 
 import Contract.Prelude
 
@@ -22,7 +22,7 @@ import Seabug.Contract.Mint (mintWithCollection')
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidatorAddr)
 import Seabug.Types (MarketplaceDatum(..), MintCnftParams(..))
-import Test.Util
+import Test.Contract.Util
   ( assertContract
   , checkNftAtAddress
   , findUtxoWithNft

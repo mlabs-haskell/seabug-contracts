@@ -73,8 +73,13 @@
           project = psProjectFor system;
         in
         {
-          seabug-contracts = project.runPursTest {
+          seabug-contracts-unit-test = project.runPursTest {
             sources = [ "exe" "test" "src" ];
+          };
+          seabug-contracts-plutip-test = project.runPlutipTest {
+            name = "seabug-contracts-plutip-test";
+            testMain = "Test.Plutip";
+            env = {};
           };
           formatting-check = pkgs.runCommand "formatting-check"
             {
