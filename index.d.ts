@@ -21,6 +21,7 @@ export type NetworkId
 export type Config = {
     serverHost: string,
     serverPort: number,
+    logLevel: string,
     // If CTL Haskell server uses SSL
     serverSecureConn: boolean,
     ogmiosHost: string,

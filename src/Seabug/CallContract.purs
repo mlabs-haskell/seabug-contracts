@@ -238,7 +238,7 @@ buildContractConfig cfg = do
     , networkId: networkId
     , logLevel: logLevel
     , extraConfig: {}
-    , walletSpec: Just ConnectToNami
+    , walletSpec: Nothing
     , customLogger: Nothing
     }
 
