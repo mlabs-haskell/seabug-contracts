@@ -51,7 +51,7 @@ import Data.Array (find) as Array
 import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
-import Data.Map (insert, toUnfoldable)
+import Data.Map (singleton, toUnfoldable) as Map
 import Plutus.Types.Transaction (UtxoM)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.Metadata.Share (mkShare)
@@ -177,20 +177,21 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
     containsNft (_ /\ TransactionOutput out) =
       Value.valueOf out.amount curr oldName == one
 
-  userAddr <- liftedM (name <> ": Cannot get user addr") getWalletAddress
-  userUtxos <-
-    liftedM (name <> ": Cannot get user Utxos") $ utxosAt userAddr
-  utxo /\ utxoIndex <-
-    liftContractM (name <> ": NFT not found")
-      $ Array.find containsNft
-      $ toUnfoldable
-      $ unwrap
-      $ fromMaybe userUtxos mScriptUtxos
+    findNftUtxo = liftContractM (name <> ": NFT not found")
+      <<< Array.find containsNft
+      <<< Map.toUnfoldable
+      <<< unwrap
+
+  utxo /\ utxoIndex <- findNftUtxo =<< case mScriptUtxos of
+    Nothing -> do
+      userAddr <- liftedM (name <> ": Cannot get user addr") getWalletAddress
+      liftedM (name <> ": Cannot get user Utxos") $ utxosAt userAddr
+    Just scriptUtxos -> pure scriptUtxos
+
   let
-    utxosForTx = insert utxo utxoIndex $ unwrap userUtxos
     lookups = mconcat
       [ ScriptLookups.mintingPolicy policy
-      , ScriptLookups.unspentOutputs utxosForTx
+      , ScriptLookups.unspentOutputs $ Map.singleton utxo utxoIndex
       ]
 
     constraints = mustMintValueWithRedeemer mintRedeemer
