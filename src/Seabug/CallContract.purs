@@ -10,7 +10,7 @@ module Seabug.CallContract
 import Contract.Prelude hiding (null)
 
 import Contract.Address (Slot(Slot))
-import Contract.Config (WalletSpec(..), ConfigParams)
+import Contract.Config (ConfigParams)
 import Contract.Monad (runContract)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
