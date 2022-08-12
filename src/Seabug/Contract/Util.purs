@@ -81,6 +81,8 @@ modify fn t = wrap (fn (unwrap t))
 
 data ReturnBehaviour = ToMarketPlace | ToCaller
 
+-- | Build and submit a transaction involving a given nft, specifying
+-- | if the nft should be sent to the current user or the marketplace.
 seabugTxToMarketTx
   :: forall (r :: Row Type)
    . String
@@ -105,8 +107,8 @@ seabugTxToMarketTx name retBehaviour mkTxData nftData = do
       [ ScriptLookups.typedValidatorLookups $ wrap marketplaceValidator'
       , ScriptLookups.validator marketplaceValidator'.validator
       ]
-    newNftValue = Value.singleton (fst txData.newAsset) (snd txData.newAsset)
-      one
+    newNftValue =
+      Value.singleton (fst txData.newAsset) (snd txData.newAsset) one
     constraints = txData.constraints
       <> mustSpendScriptOutput txData.inputUtxo unitRedeemer
       <>
@@ -142,11 +144,14 @@ seabugTxToMarketTx name retBehaviour mkTxData nftData = do
     <> show transactionHash
   log $ name <> ": Buy successful: " <> show txData.newAsset
 
+-- | Make tx data to change an nft's `NftId` by "reminting"
+-- | it. Provide a utxo map for the nft's utxo to be found in; if a
+-- | map is not provided, the current user's address will be searched.
 mkChangeNftIdTxData
   :: forall (r :: Row Type)
    . String
-  -> (NftId -> MintAct)
-  -> (NftId -> NftId)
+  -> (NftId -> MintAct) -- To make the minting policy redeemer
+  -> (NftId -> NftId) -- To update the nft's `NftId`
   -> NftData
   -> Maybe UtxoM
   -> Contract r SeabugTxData

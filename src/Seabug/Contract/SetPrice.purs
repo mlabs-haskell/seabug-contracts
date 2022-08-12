@@ -24,10 +24,10 @@ mkSetPriceTxData
   -> Maybe UtxoM
   -> Contract r SeabugTxData
 mkSetPriceTxData newPrice =
-  mkChangeNftIdTxData "setPrice" (flip ChangePrice newPrice) $ modify $ _
-    { price = newPrice }
+  mkChangeNftIdTxData "setPrice" (flip ChangePrice newPrice)
+    $ modify _ { price = newPrice }
 
 marketplaceSetPrice
   :: forall (r :: Row Type). Natural -> NftData -> Contract r Unit
-marketplaceSetPrice = seabugTxToMarketTx "marketplaceSetPrice" ToMarketPlace <<<
-  mkSetPriceTxData
+marketplaceSetPrice =
+  seabugTxToMarketTx "marketplaceSetPrice" ToMarketPlace <<< mkSetPriceTxData
