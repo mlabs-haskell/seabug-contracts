@@ -347,6 +347,7 @@ let additions =
             , "spec"
             , "spec-quickcheck"
             , "strings"
+            , "stringutils"
             , "tailrec"
             , "text-encoding"
             , "these"
@@ -362,7 +363,7 @@ let additions =
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
           -- should be same rev as in flake.nix
-        , version = "6c018d43ddfef771bfd586e885ecb0cc7ebd8421"
+        , version = "d918af3e09a80e0c3325f0350a97e753d18495bb"
         }
       }
 in upstream // additions
