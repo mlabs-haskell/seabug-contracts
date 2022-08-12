@@ -2,8 +2,8 @@ module Seabug.Contract.MarketPlaceBuy (marketplaceBuy) where
 
 import Contract.Prelude
 
-import Contract.Address (getNetworkId, ownPaymentPubKeyHash)
-import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
+import Contract.Address (ownPaymentPubKeyHash)
+import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.PlutusData
   ( Datum(Datum)
@@ -11,15 +11,15 @@ import Contract.PlutusData
   , toData
   , unitRedeemer
   )
-import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
 import Contract.ScriptLookups
-  ( mintingPolicy
-  , validator
+  ( ScriptLookups
+  , mintingPolicy
   , ownPaymentPubKeyHash
   , typedValidatorLookups
   , unspentOutputs
+  , validator
   ) as ScriptLookups
-import Contract.Scripts (typedValidatorEnterpriseAddress)
+import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
 import Contract.Transaction
   ( TransactionOutput(TransactionOutput)
   , balanceAndSignTxE
@@ -40,7 +40,7 @@ import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt, fromInt)
 import Data.Map (insert, toUnfoldable)
 import Seabug.Contract.Util (minAdaOnlyUTxOValue, setSeabugMetadata)
-import Seabug.MarketPlace (marketplaceValidator)
+import Seabug.MarketPlace (marketplaceValidator, marketplaceValidatorAddr)
 import Seabug.Metadata.Share (maxShare)
 import Seabug.MintingPolicy (mkMintingPolicy, mkTokenName)
 import Seabug.Types
@@ -85,16 +85,12 @@ mkMarketplaceBuyTx (NftData nftData) = do
     $ liftAff
     $ Value.scriptCurrencySymbol policy
 
-  marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
-  networkId <- getNetworkId
+  marketplaceValidator' <- unwrap <$> marketplaceValidator
   let
     nft = nftData.nftId
     nft' = unwrap nft
     newNft = NftId nft' { owner = pkh }
-  scriptAddr <-
-    liftContractM "marketplaceBuy: Cannot convert validator hash to address"
-      $ typedValidatorEnterpriseAddress networkId
-      $ wrap marketplaceValidator'
+  scriptAddr <- marketplaceValidatorAddr
   oldName <- liftedM "marketplaceBuy: Cannot hash old token" $ mkTokenName nft
   newName <- liftedM "marketplaceBuy: Cannot hash new token"
     $ mkTokenName newNft
@@ -119,8 +115,8 @@ mkMarketplaceBuyTx (NftData nftData) = do
 
     filterLowValue
       :: BigInt
-      -> (Value.Value -> TxConstraints Unit Unit)
-      -> TxConstraints Unit Unit
+      -> (Value.Value -> TxConstraints Void Void)
+      -> TxConstraints Void Void
     filterLowValue v t
       | v < minAdaOnlyUTxOValue = mempty
       | otherwise = t (Value.lovelaceValueOf v)
@@ -144,6 +140,8 @@ mkMarketplaceBuyTx (NftData nftData) = do
       $ unwrap scriptUtxos
   let
     utxosForTx = insert utxo utxoIndex $ unwrap userUtxos
+
+    lookup :: ScriptLookups.ScriptLookups Void
     lookup = mconcat
       [ ScriptLookups.mintingPolicy policy
       , ScriptLookups.typedValidatorLookups $ wrap marketplaceValidator'
@@ -152,6 +150,7 @@ mkMarketplaceBuyTx (NftData nftData) = do
       , ScriptLookups.ownPaymentPubKeyHash pkh
       ]
 
+    constraints :: TxConstraints Void Void
     constraints =
       filterLowValue
         daoShare

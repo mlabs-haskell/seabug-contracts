@@ -55,12 +55,14 @@ mintCnft (MintCnftParams params) = do
     =<< hexToByteArray params.tokenNameString
   let
     value = singleton curr tn one
+
+    lookups :: Lookups.ScriptLookups Void
     lookups = mconcat
       [ Lookups.mintingPolicy policy
       , Lookups.unspentOutputs $ unwrap utxos
       ]
 
-    constraints :: Constraints.TxConstraints Unit Unit
+    constraints :: Constraints.TxConstraints Void Void
     constraints = mconcat
       [ Constraints.mustMintValue value
       , Constraints.mustSpendPubKeyOutput oref
