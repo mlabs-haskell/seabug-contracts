@@ -1,4 +1,7 @@
-module Seabug.Contract.MarketPlaceBuy (marketplaceBuy) where
+module Seabug.Contract.MarketPlaceBuy
+  ( marketplaceBuy
+  , marketplaceBuy'
+  ) where
 
 import Contract.Prelude
 
@@ -21,7 +24,8 @@ import Contract.ScriptLookups
   ) as ScriptLookups
 import Contract.ScriptLookups (UnattachedUnbalancedTx, mkUnbalancedTx)
 import Contract.Transaction
-  ( TransactionOutput(TransactionOutput)
+  ( TransactionHash
+  , TransactionOutput(TransactionOutput)
   , balanceAndSignTxE
   , submit
   )
@@ -33,6 +37,7 @@ import Contract.TxConstraints
   , mustSpendScriptOutput
   )
 import Contract.Utxos (utxosAt)
+import Contract.Value (CurrencySymbol, TokenName)
 import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
 import Data.Array (find) as Array
@@ -53,7 +58,16 @@ import Seabug.Types
 -- | Attempts to submit a transaction where the current user purchases
 -- | the passed NFT.
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
-marketplaceBuy nftData = do
+marketplaceBuy = void <<< marketplaceBuy'
+
+-- | Attempts to submit a transaction where the current user purchases
+-- | the passed NFT, returns the transaction hash and the updated
+-- | sgNft.
+marketplaceBuy'
+  :: forall (r :: Row Type)
+   . NftData
+  -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName))
+marketplaceBuy' nftData = do
   unattachedBalancedTx /\ curr /\ newName <- mkMarketplaceBuyTx nftData
   signedTx <- liftedE
     ( lmap
@@ -67,6 +81,7 @@ marketplaceBuy nftData = do
   log $ "marketplaceBuy: Transaction successfully submitted with hash: "
     <> show transactionHash
   log $ "marketplaceBuy: Buy successful: " <> show (curr /\ newName)
+  pure $ transactionHash /\ (curr /\ newName)
 
 -- https://github.com/mlabs-haskell/plutus-use-cases/blob/927eade6aa9ad37bf2e9acaf8a14ae2fc304b5ba/mlabs/src/Mlabs/EfficientNFT/Contract/MarketplaceBuy.hs
 -- rev: 2c9ce295ccef4af3f3cb785982dfe554f8781541

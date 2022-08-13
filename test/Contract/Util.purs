@@ -1,12 +1,19 @@
 module Test.Contract.Util
   ( assertContract
+  , assertLovelaceChangeAtAddr
+  , assertLovelaceDecAtAddr
+  , assertLovelaceIncAtAddr
   , callMintCnft
   , callMintSgNft
+  , checkBalanceChangeAtAddr
   , checkNftAtAddress
   , findUtxoWithNft
   , mintParams1
   , plutipConfig
   , privateStakeKey
+  , valueAtAddress
+  , valueToLovelace
+  , withAssertions
   ) where
 
 import Contract.Prelude
@@ -18,9 +25,20 @@ import Contract.Numeric.Natural as Nat
 import Contract.Test.Plutip (PlutipConfig)
 import Contract.Transaction (TransactionOutput(..), awaitTxConfirmed)
 import Contract.Utxos (utxosAt)
-import Contract.Value (CurrencySymbol, TokenName, valueOf)
+import Contract.Value
+  ( CurrencySymbol
+  , TokenName
+  , Value
+  , getLovelace
+  , valueOf
+  , valueToCoin
+  )
 import Contract.Wallet (privateKeyFromBytes)
+import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
+import Data.Map as Map
+import Data.Monoid.Endo (Endo(..))
+import Data.Newtype (ala)
 import Data.UInt as UInt
 import Effect.Exception (throw)
 import Partial.Unsafe (unsafePartial)
@@ -132,3 +150,85 @@ findUtxoWithNft (nftCs /\ nftTn) addr = do
         valueOf amount nftCs nftTn == one
     )
     utxos
+
+valueToLovelace :: Value -> BigInt
+valueToLovelace = getLovelace <<< valueToCoin
+
+valueAtAddress :: forall (r :: Row Type). Address -> Contract r (Maybe Value)
+valueAtAddress address = utxosAt address <#> map
+  (fold <<< map _.amount <<< map unwrap <<< Map.values <<< unwrap)
+
+-- | `checkBalanceChangeAtAddr addrName addr check contract` returns
+-- | the result of passing to `check` the total value at the address
+-- | `addr` (named `addrName`) before and after calling `contract`.
+checkBalanceChangeAtAddr
+  :: forall (r :: Row Type) a b
+   . String
+  -> Address
+  -> (Value -> Value -> Contract r b)
+  -> Contract r a
+  -> Contract r b
+checkBalanceChangeAtAddr addrName addr check contract = do
+  valueBefore <- liftedM ("Could not get " <> addrName <> " value before") $
+    valueAtAddress addr
+  void $ contract
+  valueAfter <- liftedM ("Could not get " <> addrName <> " value after") $
+    valueAtAddress addr
+  check valueBefore valueAfter
+
+-- | `assertLovelaceChangeAtAddr addrName addr expected comp contract`
+-- | requires the predicate `comp actual expected` to succeed, where
+-- | `actual` is the lovelace at `addr` after `contract` minus the
+-- | lovelace before.
+assertLovelaceChangeAtAddr
+  :: forall (r :: Row Type) a
+   . String
+  -> Address
+  -> BigInt
+  -> (BigInt -> BigInt -> Boolean)
+  -> Contract r a
+  -> Contract r Unit
+assertLovelaceChangeAtAddr addrName addr expected comp contract =
+  flip (checkBalanceChangeAtAddr addrName addr) contract \valBefore valAfter ->
+    do
+      let actual = valueToLovelace valAfter - valueToLovelace valBefore
+      assertContract
+        ( "Unexpected lovelace change at addr " <> addrName
+            <> "\n expected="
+            <> show expected
+            <> "\n actual="
+            <> show actual
+        )
+        $ comp actual expected
+
+-- | Requires that at least the passed amount of lovelace was gained
+-- | at the address by calling the contract.
+assertLovelaceIncAtAddr
+  :: forall (r :: Row Type) a
+   . String
+  -> Address
+  -> BigInt
+  -> Contract r a
+  -> Contract r Unit
+assertLovelaceIncAtAddr addrName addr minGain contract =
+  assertLovelaceChangeAtAddr addrName addr minGain (>=) contract
+
+-- | Requires that at least the passed amount of lovelace was lost at
+-- | the address by calling the contract.
+assertLovelaceDecAtAddr
+  :: forall (r :: Row Type) a
+   . String
+  -> Address
+  -> BigInt
+  -> Contract r a
+  -> Contract r Unit
+assertLovelaceDecAtAddr addrName addr minLoss contract =
+  assertLovelaceChangeAtAddr addrName addr (negate minLoss) (<=) contract
+
+-- | Composes assertions to be run with a contract.
+withAssertions
+  :: forall (r :: Row Type) a
+   . Array (Contract r Unit -> Contract r Unit)
+  -> Contract r a
+  -> Contract r Unit
+withAssertions assertions contract = ala Endo foldMap assertions (void contract)
