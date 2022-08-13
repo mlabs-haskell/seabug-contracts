@@ -3,6 +3,7 @@ module Test.Plutip (main) where
 import Contract.Prelude
 
 import Contract.Monad (launchAff_)
+import Test.Contract.Buy as Buy
 import Test.Contract.Minting as Minting
 import Test.Spec.Runner (defaultConfig)
 import Test.Util (interpretWithConfig)
@@ -17,4 +18,6 @@ main = launchAff_ $ interpretWithConfig
   plutipTestPlan
 
 plutipTestPlan :: TestPlanM Unit
-plutipTestPlan = Minting.suite
+plutipTestPlan = do
+  Minting.suite
+  Buy.suite

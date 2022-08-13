@@ -41,12 +41,12 @@ import Seabug.Types
   )
 
 -- | Mint the self-governed NFT for the given collection, and return
--- | sgNft info.
+-- | sgNft's asset class and nft data.
 mintWithCollection'
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName
   -> MintParams
-  -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName))
+  -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
 mintWithCollection'
   (collectionNftCs /\ collectionNftTn)
   ( MintParams
@@ -106,15 +106,13 @@ mintWithCollection'
       , Constraints.mustValidateIn $ from now
       ]
   unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
-  unbalancedTxWithMetadata <- setSeabugMetadata
-    (NftData { nftId: nft, nftCollection: collection })
-    curr
-    unbalancedTx
+  let nftData = NftData { nftId: nft, nftCollection: collection }
+  unbalancedTxWithMetadata <- setSeabugMetadata nftData curr unbalancedTx
   signedTx <- liftedE $ balanceAndSignTxE unbalancedTxWithMetadata
   transactionHash <- submit signedTx
-  log $ "Mint transaction successfully submitted with hash: " <> show
-    transactionHash
-  pure $ transactionHash /\ (curr /\ tn)
+  log $ "Mint transaction successfully submitted with hash: "
+    <> show transactionHash
+  pure $ transactionHash /\ (curr /\ tn) /\ nftData
 
 -- | Mint the self-governed NFT for the given collection.
 mintWithCollection

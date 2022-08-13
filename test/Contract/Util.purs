@@ -1,25 +1,76 @@
 module Test.Contract.Util
   ( assertContract
+  , callMintCnft
+  , callMintSgNft
   , checkNftAtAddress
   , findUtxoWithNft
+  , mintParams1
   , plutipConfig
   , privateStakeKey
   ) where
 
 import Contract.Prelude
 
-import Contract.Address (Address)
+import Contract.Address (Address, Slot(..))
 import Contract.Config (PrivateStakeKey)
 import Contract.Monad (Contract, liftedM)
+import Contract.Numeric.Natural as Nat
 import Contract.Test.Plutip (PlutipConfig)
-import Contract.Transaction (TransactionOutput(..))
+import Contract.Transaction (TransactionOutput(..), awaitTxConfirmed)
 import Contract.Utxos (utxosAt)
 import Contract.Value (CurrencySymbol, TokenName, valueOf)
 import Contract.Wallet (privateKeyFromBytes)
+import Data.BigInt as BigInt
 import Data.UInt as UInt
 import Effect.Exception (throw)
 import Partial.Unsafe (unsafePartial)
+import Seabug.Contract.CnftMint (mintCnft)
+import Seabug.Contract.Mint (mintWithCollection')
+import Seabug.Types (MintCnftParams(..), MintParams, NftData)
+import Types.BigNum as BigNum
 import Types.RawBytes (hexToRawBytes)
+
+mintParams1 :: MintParams
+mintParams1 = wrap
+  { authorShare: Nat.fromInt' 1000
+  , daoShare: Nat.fromInt' 1000
+  , price: Nat.fromInt' $ 100 * 1000000
+  , lockLockup: BigInt.fromInt 5
+  , lockLockupEnd: Slot $ BigNum.fromInt 5
+  , feeVaultKeys: []
+  }
+
+callMintCnft
+  ∷ forall (r :: Row Type). Contract r (CurrencySymbol /\ TokenName)
+callMintCnft = do
+  log "Minting cnft..."
+  txHash /\ cnft <- mintCnft $
+    MintCnftParams
+      { imageUri:
+          "ipfs://k2cwuebwvb6kdiwob6sb2yqnz38r0yv72q1xijbts9ep5lq3nm8rw3i4"
+      , tokenNameString: "abcdef"
+      , name: "Piaggio Ape"
+      , description: "Seabug Testing"
+      }
+  log $ "Waiting for confirmation of cnft transaction: " <> show txHash
+  awaitTxConfirmed txHash
+  log $ "Cnft transaction confirmed: " <> show txHash
+  log $ "Minted cnft: " <> show cnft
+  pure cnft
+
+callMintSgNft
+  :: forall (r :: Row Type)
+   . Tuple CurrencySymbol TokenName
+  -> MintParams
+  -> Contract r ((CurrencySymbol /\ TokenName) /\ NftData)
+callMintSgNft cnft mintParams = do
+  log "Minting sgNft..."
+  sgNftTxHash /\ sgNft /\ nftData <- mintWithCollection' cnft mintParams
+  log $ "Waiting for confirmation of nft transaction: " <> show
+    sgNftTxHash
+  awaitTxConfirmed sgNftTxHash
+  log $ "Nft transaction confirmed: " <> show sgNftTxHash
+  pure $ sgNft /\ nftData
 
 plutipConfig :: PlutipConfig
 plutipConfig =
