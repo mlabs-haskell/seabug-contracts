@@ -23,7 +23,7 @@ import Test.Contract.Util
   , findUtxoWithNft
   , mintParams1
   , plutipConfig
-  , privateStakeKey
+  , privateStakeKey1
   )
 import TestM (TestPlanM)
 
@@ -32,7 +32,7 @@ suite =
   test "Minting" do
     let
       distribution =
-        ( withStakeKey privateStakeKey
+        ( withStakeKey privateStakeKey1
             [ BigInt.fromInt 1_000_000_000
             , BigInt.fromInt 2_000_000_000
             ]
