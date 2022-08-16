@@ -10,7 +10,7 @@ import Contract.Time (Slot(Slot))
 import Contract.Value (mkCurrencySymbol, mkTokenName)
 import Data.BigInt as BigInt
 import Effect.Aff (launchAff_)
-import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
+import Seabug.Contract.Buy (marketplaceBuy)
 import Seabug.Types
   ( NftCollection(NftCollection)
   , NftData(NftData)

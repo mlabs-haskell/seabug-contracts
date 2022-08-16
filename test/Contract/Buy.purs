@@ -14,7 +14,8 @@ import Contract.Test.Plutip (runPlutipContract, withKeyWallet, withStakeKey)
 import Contract.Transaction (awaitTxConfirmed)
 import Data.BigInt as BigInt
 import Mote (only, test)
-import Seabug.Contract.MarketPlaceBuy (marketplaceBuy')
+import Seabug.Contract.Buy (marketplaceBuy')
+import Seabug.Contract.Util (ReturnBehaviour(..))
 import Seabug.MarketPlace (marketplaceValidatorAddr)
 import Test.Contract.Util
   ( assertContract
@@ -68,11 +69,11 @@ suite =
           , assertLovelaceIncAtAddr "Seller" sellerPayAddr minSellerGain
           ]
           do
-            txHash /\ newSgNft <- marketplaceBuy' nftData
+            txHash /\ txData <- marketplaceBuy' ToMarketPlace nftData
             awaitTxConfirmed txHash
             newSgNftUtxo <-
               liftedM "Marketplace script did not contain new sgNft"
-                $ findUtxoWithNft newSgNft mpScriptAddr
+                $ findUtxoWithNft txData.newAsset mpScriptAddr
             assertContract "Marketplace script contained old sgNft"
               =<< not
               <$> checkNftAtAddress oldSgNft mpScriptAddr

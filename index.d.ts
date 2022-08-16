@@ -9,8 +9,10 @@ export function callMarketPlaceListNft(config: Config):
  */
 export function callMarketPlaceFetchNft(config: Config, args: FetchNftArgs):
     Promise<NftListing?>
-export function connectWallet(): Promise<any>
+export function connectWallet(walletOption: WalletOption): Promise<any>
 export function getWalletBalance(config: Config): Promise<any>
+
+export type WalletOption = "Nami" | "Gero";
 
 export type NetworkId
     = 0 // Testnet
@@ -19,6 +21,7 @@ export type NetworkId
 export type Config = {
     serverHost: string,
     serverPort: number,
+    logLevel: string,
     // If CTL Haskell server uses SSL
     serverSecureConn: boolean,
     ogmiosHost: string,

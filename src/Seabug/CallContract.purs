@@ -1,5 +1,6 @@
 module Seabug.CallContract
-  ( callGetWalletBalance
+  ( callConnectWallet
+  , callGetWalletBalance
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
@@ -9,7 +10,7 @@ module Seabug.CallContract
 import Contract.Prelude hiding (null)
 
 import Contract.Address (Slot(Slot))
-import Contract.Config (WalletSpec(..), ConfigParams)
+import Contract.Config (ConfigParams)
 import Contract.Monad (runContract)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
@@ -30,6 +31,7 @@ import Contract.Value
   , mkCurrencySymbol
   , mkTokenName
   )
+import Control.Monad.Error.Class (throwError)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.BigInt (BigInt)
@@ -43,9 +45,9 @@ import Effect.Aff (error)
 import Effect.Exception (Error)
 import Partial.Unsafe (unsafePartial)
 import Plutus.Conversion (fromPlutusAddress)
+import Seabug.Contract.Buy (marketplaceBuy)
 import Seabug.Contract.CnftMint (mintCnft)
 import Seabug.Contract.Common (NftResult)
-import Seabug.Contract.MarketPlaceBuy (marketplaceBuy)
 import Seabug.Contract.MarketPlaceFetchNft (marketPlaceFetchNft)
 import Seabug.Contract.MarketPlaceListNft (marketPlaceListNft)
 import Seabug.Contract.Mint (mintWithCollection)
@@ -67,6 +69,16 @@ import Serialization.Hash
   )
 import Types.BigNum as BigNum
 import Types.Natural as Nat
+import Wallet (Wallet, mkNamiWalletAff, mkGeroWalletAff)
+
+callConnectWallet
+  :: forall (r :: Row Type)
+   . String
+  -> Effect (Promise Wallet)
+callConnectWallet walletOption = case walletOption of
+  "Nami" -> Promise.fromAff mkNamiWalletAff
+  "Gero" -> Promise.fromAff mkGeroWalletAff
+  _ -> throwError <<< error $ "Unsupported wallet: " <> walletOption
 
 callGetWalletBalance
   :: ContractConfiguration -> Effect (Promise (Nullable Value))
@@ -226,7 +238,7 @@ buildContractConfig cfg = do
     , networkId: networkId
     , logLevel: logLevel
     , extraConfig: {}
-    , walletSpec: Just ConnectToNami
+    , walletSpec: Nothing
     , customLogger: Nothing
     }
 
