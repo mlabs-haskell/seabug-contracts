@@ -8,7 +8,8 @@ import Contract.Prelude
 import Control.Promise (Promise)
 import Data.BigInt as BigInt
 import Seabug.CallContract
-  ( callMarketPlaceBuy
+  ( callConnectWallet
+  , callMarketPlaceBuy
   , callMarketPlaceListNft
   , callMarketPlaceFetchNft
   , callMint
