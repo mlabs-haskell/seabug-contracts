@@ -17,7 +17,11 @@ import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Mote (group, only, skip, test)
 import Seabug.Contract.Buy (marketplaceBuy')
-import Seabug.Contract.Util (ReturnBehaviour(..), SeabugTxData)
+import Seabug.Contract.Util
+  ( ReturnBehaviour(..)
+  , SeabugTxData
+  , minAdaOnlyUTxOValue
+  )
 import Seabug.MarketPlace (marketplaceValidatorAddr)
 import Seabug.Types (MintParams)
 import Test.Contract.Util
@@ -109,14 +113,14 @@ suite =
   only $ group "Buy" do
     test "Seller is author, no low prices, nft to marketplace" $
       mkBuyTest buyTestConfig1
-    skip $ test "Seller is author, no low prices, nft to buyer" $
+    test "Seller is author, no low prices, nft to buyer" $
       mkBuyTest buyTestConfig1
         { retBehaviour = ToCaller
         , postBuyAssertions = nftToBuyerAssert
         }
     test "Seller is author, low marketplace share, nft to marketplace" $
       mkBuyTest buyTestConfig2
-    skip $ test "Seller is author, low marketplace share, nft to buyer" $
+    test "Seller is author, low marketplace share, nft to buyer" $
       mkBuyTest buyTestConfig2
         { retBehaviour = ToCaller
         , postBuyAssertions = nftToBuyerAssert
@@ -165,10 +169,10 @@ mkShareAssertions
   let
     minBuyerLoss = Nat.toBigInt (unwrap mintParams).price
   in
-    [ assertLovelaceIncAtAddr "Marketplace" mpScriptAddr minMpGain
+    [ assertLovelaceIncAtAddr "Author" authorPayAddr minAuthorGain
     , assertLovelaceIncAtAddr "Seller" sellerPayAddr minSellerGain
-    , assertLovelaceIncAtAddr "Author" authorPayAddr minAuthorGain
     , assertLovelaceDecAtAddr "Buyer" buyerAddr minBuyerLoss
+    , assertLovelaceIncAtAddr "Marketplace" mpScriptAddr minMpGain
     ]
 
 runBuyTest

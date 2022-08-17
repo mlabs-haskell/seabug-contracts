@@ -134,9 +134,9 @@ plutipConfig =
   , postgresConfig:
       { host: "127.0.0.1"
       , port: UInt.fromInt 5433
-      , user: "seabugTests"
-      , password: "seabugTests"
-      , dbname: "seabugTests"
+      , user: "ctxlib"
+      , password: "ctxlib"
+      , dbname: "ctxlib"
       }
   }
 
