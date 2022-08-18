@@ -80,7 +80,9 @@
         });
 
       hydraJobs = {
-        inherit (self) checks packages devShells;
+        checks = {inherit (self.checks) x86_64-linux;};
+        packages = {inherit (self.packages) x86_64-linux;};
+        devShell = {inherit (self.devShell) x86_64-linux;};
       };
       
       check = perSystem (system:
