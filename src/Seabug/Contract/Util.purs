@@ -10,7 +10,7 @@ module Seabug.Contract.Util
 
 import Contract.Prelude
 
-import Contract.Address (getNetworkId, toPubKeyHash, toValidatorHash)
+import Contract.Address (getNetworkId)
 import Contract.AuxiliaryData (setTxMetadata)
 import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
 import Contract.Numeric.Natural (toBigInt)
@@ -18,7 +18,6 @@ import Contract.PlutusData
   ( Datum(Datum)
   , Redeemer(Redeemer)
   , toData
-  , unitDatum
   , unitRedeemer
   )
 import Contract.ScriptLookups
@@ -36,22 +35,20 @@ import Contract.ScriptLookups
 import Contract.Scripts (typedValidatorEnterpriseAddress)
 import Contract.Transaction
   ( TransactionHash
-  , TransactionOutput(..)
+  , TransactionOutput(TransactionOutput)
   , balanceAndSignTxE
   , submit
   )
 import Contract.TxConstraints
   ( TxConstraints
   , mustMintValueWithRedeemer
-  , mustPayToPubKey
   , mustPayToScript
   , mustSpendScriptOutput
   )
 import Contract.Utxos (utxosAt)
-import Contract.Value (CurrencySymbol, coinToValue, valueToCoin)
+import Contract.Value (CurrencySymbol)
 import Contract.Value as Value
 import Contract.Wallet (getWalletAddress)
-import Control.Alt ((<|>))
 import Data.Array (find) as Array
 import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt)
@@ -197,18 +194,14 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
       liftedM (name <> ": Cannot get user Utxos") $ utxosAt userAddr
     Just scriptUtxos -> pure scriptUtxos
 
-  continueAdaConstraint <-
-    liftContractM "Could not tell where to continue the ada of the nft utxo"
-      $ mustContinueAdaOfUtxo utxoIndex
   let
     lookups = mconcat
       [ ScriptLookups.mintingPolicy policy
       , ScriptLookups.unspentOutputs $ Map.singleton utxo utxoIndex
       ]
 
-    constraints =
-      mustMintValueWithRedeemer mintRedeemer (newNftValue <> oldNftValue)
-        <> continueAdaConstraint
+    constraints = mustMintValueWithRedeemer mintRedeemer
+      (newNftValue <> oldNftValue)
 
   pure
     { constraints: constraints
@@ -218,14 +211,6 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
     , inputUtxo: utxo
     , newNft: newNft
     }
-
-mustContinueAdaOfUtxo :: TransactionOutput -> Maybe (TxConstraints Void Void)
-mustContinueAdaOfUtxo (TransactionOutput { address, amount }) = do
-  let adaValue = coinToValue $ valueToCoin amount
-  constraint <-
-    (flip mustPayToScript unitDatum <$> toValidatorHash address)
-      <|> (mustPayToPubKey <<< wrap <$> toPubKeyHash address)
-  pure $ constraint adaValue
 
 minAdaOnlyUTxOValue :: BigInt
 minAdaOnlyUTxOValue = BigInt.fromInt 2_000_000
