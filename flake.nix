@@ -79,6 +79,10 @@
             '';
         });
 
+      hydraJobs = {
+        inherit (self) checks packages devShells;
+      };
+      
       check = perSystem (system:
         (nixpkgsFor system).runCommand "combined-test"
           {
