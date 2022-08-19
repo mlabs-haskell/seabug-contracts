@@ -566,17 +566,17 @@
         "servant-purescript": "servant-purescript_2"
       },
       "locked": {
-        "lastModified": 1660312241,
-        "narHash": "sha256-qBAU3TS8X1IFUvcmJaW66jGgaP2Kwu/5WS7VFwBSPmY=",
+        "lastModified": 1660663244,
+        "narHash": "sha256-y+RAgaJZ2gQct0EIE8/0040Z4IvA9HktmcfOAWVOyeY=",
         "owner": "Plutonomicon",
         "repo": "cardano-transaction-lib",
-        "rev": "d918af3e09a80e0c3325f0350a97e753d18495bb",
+        "rev": "058eeed77b472231e34e8c994be071f4196a0b2f",
         "type": "github"
       },
       "original": {
         "owner": "Plutonomicon",
         "repo": "cardano-transaction-lib",
-        "rev": "d918af3e09a80e0c3325f0350a97e753d18495bb",
+        "rev": "058eeed77b472231e34e8c994be071f4196a0b2f",
         "type": "github"
       }
     },
@@ -1490,17 +1490,17 @@
         "wai-routes": "wai-routes"
       },
       "locked": {
-        "lastModified": 1656650330,
-        "narHash": "sha256-Rl5xNP3LVtuOzXXSsdAWNB3EXGRPsFPMvBO0TDUvSJE=",
+        "lastModified": 1660637986,
+        "narHash": "sha256-0I+yfuva9pg6pPHeWNO73oPRxCjh8I4ER0Egxf8XKdk=",
         "owner": "mlabs-haskell",
         "repo": "ogmios",
-        "rev": "e406801eaeb32b28cd84357596ca1512bff27741",
+        "rev": "9c04524d45de2c417ddda9e7ab0d587a54954c57",
         "type": "github"
       },
       "original": {
         "owner": "mlabs-haskell",
         "repo": "ogmios",
-        "rev": "e406801eaeb32b28cd84357596ca1512bff27741",
+        "rev": "9c04524d45de2c417ddda9e7ab0d587a54954c57",
         "type": "github"
       }
     },
