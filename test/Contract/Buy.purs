@@ -40,6 +40,7 @@ import Test.Contract.Util
   , mintParams2
   , mintParams3
   , mintParams4
+  , mintParams5
   , plutipConfig
   , privateStakeKey1
   , privateStakeKey2
@@ -49,6 +50,7 @@ import Test.Contract.Util
   , withAssertions
   , wrapAndAssert
   )
+import Test.Spec.Assertions (expectError)
 import TestM (TestPlanM)
 
 type BuyTestData = BuyTestData' ()
@@ -83,6 +85,7 @@ type BuyTestConfig assertions =
   , testName :: String
   , skip :: Boolean
   , only :: Boolean
+  , shouldError :: Boolean
   }
 
 buyTestConfig1 :: BuyTestConfig _
@@ -99,43 +102,41 @@ buyTestConfig1 =
   , testName: "no low shares"
   , skip: false
   , only: false
+  , shouldError: false
   }
 
 buyTestConfig2 :: BuyTestConfig _
-buyTestConfig2 =
-  { mintParams: mintParams2
-  , expectedShares:
-      { minMpGain: BigInt.fromInt 0
-      , minSellerGain: BigInt.fromInt $ 100 * 1000000
-      , minAuthorGain: BigInt.fromInt $ 100 * 1000000
+buyTestConfig2 = buyTestConfig1
+  { mintParams = mintParams2
+  , expectedShares
+      { minMpGain = BigInt.fromInt 0
+      , minSellerGain = BigInt.fromInt $ 100 * 1000000
+      , minAuthorGain = BigInt.fromInt $ 100 * 1000000
       }
-  , retBehaviour: ToMarketPlace
-  , authorIsSeller: true
-  , assertions: nftToMarketPlaceAssert
-  , testName: "low marketplace share"
-  , skip: false
-  , only: false
+  , testName = "low marketplace share"
   }
 
 buyTestConfig3 :: BuyTestConfig _
-buyTestConfig3 =
-  { mintParams: mintParams3
-  , expectedShares:
-      { minMpGain: BigInt.fromInt $ 10 * 1000000
-      , minSellerGain: BigInt.fromInt $ 90 * 1000000
-      , minAuthorGain: BigInt.fromInt $ 90 * 1000000
+buyTestConfig3 = buyTestConfig1
+  { mintParams = mintParams3
+  , expectedShares
+      { minMpGain = BigInt.fromInt $ 10 * 1000000
+      , minSellerGain = BigInt.fromInt $ 90 * 1000000
+      , minAuthorGain = BigInt.fromInt $ 90 * 1000000
       }
-  , retBehaviour: ToMarketPlace
-  , authorIsSeller: true
-  , assertions: nftToMarketPlaceAssert
-  , testName: "low author share"
-  , skip: false
-  , only: false
+  , testName = "low author share"
   }
 
 buyTestConfig4 :: BuyTestConfig _
 buyTestConfig4 = buyTestConfig2
   { mintParams = mintParams4, testName = "low author and marketplace shares" }
+
+buyTestConfig5 :: BuyTestConfig _
+buyTestConfig5 = buyTestConfig1
+  { mintParams = mintParams5
+  , testName = "price too low for min ada requirement"
+  , shouldError = true
+  }
 
 addNftToBuyerVariants :: Array (BuyTestConfig _) -> Array (BuyTestConfig _)
 addNftToBuyerVariants = Array.uncons >>> case _ of
@@ -162,7 +163,7 @@ suite :: TestPlanM Unit
 suite =
   only $ group "Buy" do
     let
-      tests = addNftToBuyerVariants
+      tests = [ buyTestConfig5 ] <> addNftToBuyerVariants
         [ buyTestConfig1
         , authorNotSellerVariant buyTestConfig1 _
             { minSellerGain = BigInt.fromInt $ 80 * 1000000
@@ -184,16 +185,6 @@ suite =
         ]
     for_ tests mkBuyTest
 
-nftToMarketPlaceAssert :: PostBuyTestData -> Array (Contract () Unit)
-nftToMarketPlaceAssert o@{ mpScriptAddr } =
-  [ assertAddrHasNewAsset mpScriptAddr o
-  , assertAddrLacksOldAsset mpScriptAddr o
-  ]
-
-nftToBuyerAssert :: PostBuyTestData -> Array (Contract () Unit)
-nftToBuyerAssert o@{ buyerAddr, mpScriptAddr } =
-  [ assertAddrHasNewAsset buyerAddr o, assertAddrLacksOldAsset mpScriptAddr o ]
-
 mkBuyTest
   :: forall f
    . WrappingAssertion f () PostBuyTestData
@@ -203,8 +194,19 @@ mkBuyTest
   conf@{ mintParams, expectedShares, retBehaviour, assertions, authorIsSeller } =
   (if conf.skip then skip else if conf.only then only else identity)
     $ test conf.testName
+    $ (if conf.shouldError then expectError else identity)
     $ runBuyTest mintParams retBehaviour authorIsSeller
         (\b -> mkShareAssertions expectedShares b /\ assertions)
+
+nftToMarketPlaceAssert :: PostBuyTestData -> Array (Contract () Unit)
+nftToMarketPlaceAssert o@{ mpScriptAddr } =
+  [ assertAddrHasNewAsset mpScriptAddr o
+  , assertAddrLacksOldAsset mpScriptAddr o
+  ]
+
+nftToBuyerAssert :: PostBuyTestData -> Array (Contract () Unit)
+nftToBuyerAssert o@{ buyerAddr, mpScriptAddr } =
+  [ assertAddrHasNewAsset buyerAddr o, assertAddrLacksOldAsset mpScriptAddr o ]
 
 assertAddrHasNewAsset :: Address -> PostBuyTestData -> Contract () Unit
 assertAddrHasNewAsset addr { txData } =

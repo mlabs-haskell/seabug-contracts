@@ -18,6 +18,7 @@ module Test.Contract.Util
   , mintParams2
   , mintParams3
   , mintParams4
+  , mintParams5
   , plutipConfig
   , privateStakeKey1
   , privateStakeKey2
@@ -88,6 +89,9 @@ mintParams4 :: MintParams
 mintParams4 = modify
   (_ { daoShare = Nat.fromInt' 10, authorShare = Nat.fromInt' 10 })
   mintParams1
+
+mintParams5 :: MintParams
+mintParams5 = modify (_ { price = Nat.fromInt' 2 }) mintParams1
 
 callMintCnft
   ∷ forall (r :: Row Type). Contract r (CurrencySymbol /\ TokenName)
