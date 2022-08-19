@@ -24,15 +24,22 @@ module Test.Contract.Util
   , privateStakeKey3
   , valueAtAddress
   , valueToLovelace
+  , walletEnterpriseAddress
   , withAssertions
   , wrapAndAssert
   ) where
 
 import Contract.Prelude
 
-import Contract.Address (Address, Slot(..))
+import Contract.Address
+  ( Address
+  , Slot(..)
+  , getNetworkId
+  , ownPaymentPubKeyHash
+  , payPubKeyHashEnterpriseAddress
+  )
 import Contract.Config (PrivateStakeKey)
-import Contract.Monad (Contract, liftedM)
+import Contract.Monad (Contract, liftContractM, liftedM)
 import Contract.Numeric.Natural as Nat
 import Contract.Test.Plutip (PlutipConfig)
 import Contract.Transaction (TransactionOutput(..), awaitTxConfirmed)
@@ -45,7 +52,7 @@ import Contract.Value
   , valueOf
   , valueToCoin
   )
-import Contract.Wallet (privateKeyFromBytes)
+import Contract.Wallet (KeyWallet, privateKeyFromBytes, withKeyWallet)
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Data.Map as Map
@@ -344,3 +351,11 @@ withAssertions
   -> Contract r a
   -> Contract r a
 withAssertions = flip wrapAndAssert
+
+walletEnterpriseAddress
+  :: forall (r :: Row Type). String -> KeyWallet -> Contract r Address
+walletEnterpriseAddress walletName wallet = withKeyWallet wallet do
+  networkId <- getNetworkId
+  pkh <- liftedM ("Cannot get " <> walletName <> " pkh") ownPaymentPubKeyHash
+  liftContractM ("Could not get " <> walletName <> " payment address") $
+    payPubKeyHashEnterpriseAddress networkId pkh

@@ -2,14 +2,8 @@ module Test.Contract.Buy (suite) where
 
 import Contract.Prelude
 
-import Contract.Address
-  ( Address
-  , getNetworkId
-  , getWalletAddress
-  , ownPaymentPubKeyHash
-  , payPubKeyHashEnterpriseAddress
-  )
-import Contract.Monad (Contract, liftContractM, liftedM)
+import Contract.Address (Address, getWalletAddress)
+import Contract.Monad (Contract, liftedM)
 import Contract.Numeric.Natural as Nat
 import Contract.Test.Plutip (runPlutipContract, withKeyWallet, withStakeKey)
 import Contract.Transaction
@@ -21,13 +15,15 @@ import Contract.Transaction
   , getTxByHash
   )
 import Contract.Value (CurrencySymbol, TokenName, getLovelace)
+import Data.Array ((:))
+import Data.Array as Array
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
-import Mote (group, only, test)
+import Mote (group, only, skip, test)
 import Plutus.Conversion (toPlutusCoin)
 import Record (merge)
 import Seabug.Contract.Buy (marketplaceBuy')
-import Seabug.Contract.Util (ReturnBehaviour(..), SeabugTxData)
+import Seabug.Contract.Util (ReturnBehaviour(..), SeabugTxData, modify)
 import Seabug.MarketPlace (marketplaceValidatorAddr)
 import Seabug.Types (MintParams(..))
 import Test.Contract.Util
@@ -47,7 +43,9 @@ import Test.Contract.Util
   , plutipConfig
   , privateStakeKey1
   , privateStakeKey2
+  , privateStakeKey3
   , valueToLovelace
+  , walletEnterpriseAddress
   , withAssertions
   , wrapAndAssert
   )
@@ -80,7 +78,11 @@ type BuyTestConfig assertions =
   { mintParams :: MintParams
   , expectedShares :: ExpectedShares
   , retBehaviour :: ReturnBehaviour
+  , authorIsSeller :: Boolean
   , assertions :: assertions
+  , testName :: String
+  , skip :: Boolean
+  , only :: Boolean
   }
 
 buyTestConfig1 :: BuyTestConfig _
@@ -92,7 +94,11 @@ buyTestConfig1 =
       , minAuthorGain: BigInt.fromInt $ 90 * 1000000
       }
   , retBehaviour: ToMarketPlace
+  , authorIsSeller: true
   , assertions: nftToMarketPlaceAssert
+  , testName: "no low shares"
+  , skip: false
+  , only: false
   }
 
 buyTestConfig2 :: BuyTestConfig _
@@ -104,7 +110,11 @@ buyTestConfig2 =
       , minAuthorGain: BigInt.fromInt $ 100 * 1000000
       }
   , retBehaviour: ToMarketPlace
+  , authorIsSeller: true
   , assertions: nftToMarketPlaceAssert
+  , testName: "low marketplace share"
+  , skip: false
+  , only: false
   }
 
 buyTestConfig3 :: BuyTestConfig _
@@ -116,48 +126,63 @@ buyTestConfig3 =
       , minAuthorGain: BigInt.fromInt $ 90 * 1000000
       }
   , retBehaviour: ToMarketPlace
+  , authorIsSeller: true
   , assertions: nftToMarketPlaceAssert
+  , testName: "low author share"
+  , skip: false
+  , only: false
   }
 
 buyTestConfig4 :: BuyTestConfig _
-buyTestConfig4 = buyTestConfig2 { mintParams = mintParams4 }
+buyTestConfig4 = buyTestConfig2
+  { mintParams = mintParams4, testName = "low author and marketplace shares" }
+
+addNftToBuyerVariants :: Array (BuyTestConfig _) -> Array (BuyTestConfig _)
+addNftToBuyerVariants = Array.uncons >>> case _ of
+  Nothing -> []
+  Just { head: conf, tail: confs } ->
+    conf
+      : conf
+          { retBehaviour = ToCaller
+          , assertions = nftToBuyerAssert
+          , testName = conf.testName <> ", nft to buyer"
+          }
+      : addNftToBuyerVariants confs
+
+authorNotSellerVariant
+  :: BuyTestConfig _ -> (ExpectedShares -> ExpectedShares) -> BuyTestConfig _
+authorNotSellerVariant conf updateShares =
+  conf
+    { expectedShares = updateShares conf.expectedShares
+    , authorIsSeller = false
+    , testName = conf.testName <> ", author is not seller"
+    }
 
 suite :: TestPlanM Unit
 suite =
   only $ group "Buy" do
-    test "Seller is author, no low prices, nft to marketplace" $
-      mkBuyTest buyTestConfig1
-    test "Seller is author, no low prices, nft to buyer" $
-      mkBuyTest buyTestConfig1
-        { retBehaviour = ToCaller
-        , assertions = nftToBuyerAssert
-        }
-    test "Seller is author, low marketplace share, nft to marketplace" $
-      mkBuyTest buyTestConfig2
-    test "Seller is author, low marketplace share, nft to buyer" $
-      mkBuyTest buyTestConfig2
-        { retBehaviour = ToCaller
-        , assertions = nftToBuyerAssert
-        }
-    test "Seller is author, low author share, nft to marketplace" $
-      mkBuyTest buyTestConfig3
-    only $ test "Seller is author, low author share, nft to buyer" $
-      mkBuyTest buyTestConfig3
-        { retBehaviour = ToCaller
-        , assertions = nftToBuyerAssert
-        }
-    test
-      "Seller is author, low author and marketplace shares, nft to marketplace"
-      $
-        mkBuyTest buyTestConfig4
-    only
-      $ test
-          "Seller is author, low author and marketplace shares, nft to buyer"
-      $
-        mkBuyTest buyTestConfig4
-          { retBehaviour = ToCaller
-          , assertions = nftToBuyerAssert
-          }
+    let
+      tests = addNftToBuyerVariants
+        [ buyTestConfig1
+        , authorNotSellerVariant buyTestConfig1 _
+            { minSellerGain = BigInt.fromInt $ 80 * 1000000
+            , minAuthorGain = BigInt.fromInt $ 10 * 1000000
+            }
+        , buyTestConfig2
+        , authorNotSellerVariant buyTestConfig2 _
+            { minSellerGain = BigInt.fromInt $ 90 * 1000000
+            , minAuthorGain = BigInt.fromInt $ 10 * 1000000
+            }
+        , buyTestConfig3
+        , authorNotSellerVariant buyTestConfig3 _
+            { minSellerGain = BigInt.fromInt $ 90 * 1000000
+            , minAuthorGain = BigInt.fromInt $ 0
+            }
+        , buyTestConfig4
+        , authorNotSellerVariant buyTestConfig4 _
+            { minAuthorGain = BigInt.fromInt $ 0 }
+        ]
+    for_ tests mkBuyTest
 
 nftToMarketPlaceAssert :: PostBuyTestData -> Array (Contract () Unit)
 nftToMarketPlaceAssert o@{ mpScriptAddr } =
@@ -173,10 +198,13 @@ mkBuyTest
   :: forall f
    . WrappingAssertion f () PostBuyTestData
   => BuyTestConfig f
-  -> Aff Unit
-mkBuyTest { mintParams, expectedShares, retBehaviour, assertions } =
-  runBuyTest mintParams retBehaviour
-    (\b -> mkShareAssertions expectedShares b /\ assertions)
+  -> TestPlanM Unit
+mkBuyTest
+  conf@{ mintParams, expectedShares, retBehaviour, assertions, authorIsSeller } =
+  (if conf.skip then skip else if conf.only then only else identity)
+    $ test conf.testName
+    $ runBuyTest mintParams retBehaviour authorIsSeller
+        (\b -> mkShareAssertions expectedShares b /\ assertions)
 
 assertAddrHasNewAsset :: Address -> PostBuyTestData -> Contract () Unit
 assertAddrHasNewAsset addr { txData } =
@@ -228,41 +256,54 @@ runBuyTest
    . WrappingAssertion f () PostBuyTestData
   => MintParams
   -> ReturnBehaviour
+  -> Boolean
   -> (BuyTestData -> f)
   -> Aff Unit
-runBuyTest mintParams retBehaviour getAssertions = do
+runBuyTest mintParams retBehaviour authorIsSeller getAssertions = do
   let
     distribution =
       ( withStakeKey privateStakeKey1
           [ BigInt.fromInt 1_000_000_000
           , BigInt.fromInt 2_000_000_000
           ]
-      ) /\
-        ( withStakeKey privateStakeKey2
-            [ BigInt.fromInt 1_000_000_000
-            , BigInt.fromInt 2_000_000_000
-            ]
-        )
-  runPlutipContract plutipConfig distribution \(seller /\ buyer) -> do
-    networkId <- getNetworkId
-    sellerPayAddr <- withKeyWallet seller do
-      sellerPkh <- liftedM "Cannot get seller pkh" ownPaymentPubKeyHash
-      liftContractM "Could not get seller payment address" $
-        payPubKeyHashEnterpriseAddress networkId sellerPkh
-    sgNft /\ nftData <- withKeyWallet seller do
+      )
+        /\
+          ( withStakeKey privateStakeKey2
+              [ BigInt.fromInt 1_000_000_000
+              , BigInt.fromInt 2_000_000_000
+              ]
+          )
+        /\
+          ( withStakeKey privateStakeKey3
+              [ BigInt.fromInt 1_000_000_000
+              , BigInt.fromInt 2_000_000_000
+              ]
+          )
+  runPlutipContract plutipConfig distribution \(author /\ seller /\ buyer) -> do
+    authorPayAddr <- walletEnterpriseAddress "author" author
+    sellerPayAddr <- walletEnterpriseAddress "seller" seller
+    initialSgNft /\ initialNftData <- withKeyWallet author do
       cnft <- callMintCnft
       callMintSgNft cnft mintParams
+    sgNft /\ nftData <-
+      if authorIsSeller then pure $ initialSgNft /\ initialNftData
+      else withKeyWallet seller do
+        txHash /\ txData <- marketplaceBuy' ToMarketPlace initialNftData
+        awaitTxConfirmed txHash
+        pure $ txData.newAsset /\ modify (_ { nftId = txData.newNft })
+          initialNftData
     withKeyWallet buyer do
       buyerAddr <- liftedM "Could not get buyer addr" getWalletAddress
       mpScriptAddr <- marketplaceValidatorAddr
       let
         buyTestData =
-          { authorPayAddr: sellerPayAddr
-          , sellerPayAddr
+          { authorPayAddr
+          , sellerPayAddr:
+              if authorIsSeller then authorPayAddr else sellerPayAddr
           , buyerAddr
           , mpScriptAddr
           , mintParams
-          , sgNft: sgNft
+          , sgNft
           }
       void $ withAssertions (getAssertions buyTestData) do
         txHash /\ txData <- marketplaceBuy' retBehaviour nftData
