@@ -12,26 +12,34 @@ import Contract.Address
 import Contract.Monad (Contract, liftContractM, liftedM)
 import Contract.Numeric.Natural as Nat
 import Contract.Test.Plutip (runPlutipContract, withKeyWallet, withStakeKey)
-import Contract.Transaction (awaitTxConfirmed)
+import Contract.Transaction
+  ( Transaction(..)
+  , TransactionHash
+  , TransactionOutput(..)
+  , TxBody(..)
+  , awaitTxConfirmed
+  , getTxByHash
+  )
+import Contract.Value (CurrencySymbol, TokenName, getLovelace)
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
-import Mote (group, only, skip, test)
+import Mote (group, only, test)
+import Plutus.Conversion (toPlutusCoin)
+import Record (merge)
 import Seabug.Contract.Buy (marketplaceBuy')
-import Seabug.Contract.Util
-  ( ReturnBehaviour(..)
-  , SeabugTxData
-  , minAdaOnlyUTxOValue
-  )
+import Seabug.Contract.Util (ReturnBehaviour(..), SeabugTxData)
 import Seabug.MarketPlace (marketplaceValidatorAddr)
-import Seabug.Types (MintParams)
+import Seabug.Types (MintParams(..))
 import Test.Contract.Util
-  ( ContractWrapAssertion
+  ( class WrappingAssertion
+  , ContractWrapAssertion
   , assertContract
   , assertLovelaceDecAtAddr
-  , assertLovelaceIncAtAddr
+  , assertLovelaceIncAtAddr'
   , callMintCnft
   , callMintSgNft
   , checkNftAtAddress
+  , findUtxoWithNft
   , mintParams1
   , mintParams2
   , mintParams3
@@ -39,22 +47,28 @@ import Test.Contract.Util
   , plutipConfig
   , privateStakeKey1
   , privateStakeKey2
+  , valueToLovelace
   , withAssertions
+  , wrapAndAssert
   )
 import TestM (TestPlanM)
 
-type BuyTestData =
+type BuyTestData = BuyTestData' ()
+
+type BuyTestData' r =
   { sellerPayAddr :: Address -- The enterprise address of the seller
   , buyerAddr :: Address -- The address used by the buyer
   , authorPayAddr :: Address -- The enterprise address of the author
   , mpScriptAddr :: Address -- The address of the marketplace script
   , mintParams :: MintParams -- The params used to mint the bought nft
+  , sgNft :: CurrencySymbol /\ TokenName -- The nft being bought
+  | r
   }
 
-type PostBuyTestData =
-  { buyTestData :: BuyTestData
-  , txData :: SeabugTxData -- The data of the buy transaction
-  }
+type PostBuyTestData = BuyTestData'
+  ( txData :: SeabugTxData -- The data of the buy transaction
+  , txHash :: TransactionHash -- The hash of the buy transaction
+  )
 
 type ExpectedShares =
   { minMpGain :: BigInt
@@ -62,14 +76,14 @@ type ExpectedShares =
   , minAuthorGain :: BigInt
   }
 
-type BuyTestConfig =
+type BuyTestConfig assertions =
   { mintParams :: MintParams
   , expectedShares :: ExpectedShares
   , retBehaviour :: ReturnBehaviour
-  , postBuyAssertions :: PostBuyTestData -> Array (Contract () Unit)
+  , assertions :: assertions
   }
 
-buyTestConfig1 :: BuyTestConfig
+buyTestConfig1 :: BuyTestConfig _
 buyTestConfig1 =
   { mintParams: mintParams1
   , expectedShares:
@@ -78,10 +92,10 @@ buyTestConfig1 =
       , minAuthorGain: BigInt.fromInt $ 90 * 1000000
       }
   , retBehaviour: ToMarketPlace
-  , postBuyAssertions: nftToMarketPlaceAssert
+  , assertions: nftToMarketPlaceAssert
   }
 
-buyTestConfig2 :: BuyTestConfig
+buyTestConfig2 :: BuyTestConfig _
 buyTestConfig2 =
   { mintParams: mintParams2
   , expectedShares:
@@ -90,10 +104,10 @@ buyTestConfig2 =
       , minAuthorGain: BigInt.fromInt $ 100 * 1000000
       }
   , retBehaviour: ToMarketPlace
-  , postBuyAssertions: nftToMarketPlaceAssert
+  , assertions: nftToMarketPlaceAssert
   }
 
-buyTestConfig3 :: BuyTestConfig
+buyTestConfig3 :: BuyTestConfig _
 buyTestConfig3 =
   { mintParams: mintParams3
   , expectedShares:
@@ -102,10 +116,10 @@ buyTestConfig3 =
       , minAuthorGain: BigInt.fromInt $ 90 * 1000000
       }
   , retBehaviour: ToMarketPlace
-  , postBuyAssertions: nftToMarketPlaceAssert
+  , assertions: nftToMarketPlaceAssert
   }
 
-buyTestConfig4 :: BuyTestConfig
+buyTestConfig4 :: BuyTestConfig _
 buyTestConfig4 = buyTestConfig2 { mintParams = mintParams4 }
 
 suite :: TestPlanM Unit
@@ -116,36 +130,53 @@ suite =
     test "Seller is author, no low prices, nft to buyer" $
       mkBuyTest buyTestConfig1
         { retBehaviour = ToCaller
-        , postBuyAssertions = nftToBuyerAssert
+        , assertions = nftToBuyerAssert
         }
     test "Seller is author, low marketplace share, nft to marketplace" $
       mkBuyTest buyTestConfig2
     test "Seller is author, low marketplace share, nft to buyer" $
       mkBuyTest buyTestConfig2
         { retBehaviour = ToCaller
-        , postBuyAssertions = nftToBuyerAssert
+        , assertions = nftToBuyerAssert
         }
     test "Seller is author, low author share, nft to marketplace" $
       mkBuyTest buyTestConfig3
+    only $ test "Seller is author, low author share, nft to buyer" $
+      mkBuyTest buyTestConfig3
+        { retBehaviour = ToCaller
+        , assertions = nftToBuyerAssert
+        }
     test
       "Seller is author, low author and marketplace shares, nft to marketplace"
       $
         mkBuyTest buyTestConfig4
+    only
+      $ test
+          "Seller is author, low author and marketplace shares, nft to buyer"
+      $
+        mkBuyTest buyTestConfig4
+          { retBehaviour = ToCaller
+          , assertions = nftToBuyerAssert
+          }
 
 nftToMarketPlaceAssert :: PostBuyTestData -> Array (Contract () Unit)
-nftToMarketPlaceAssert o@{ buyTestData: { mpScriptAddr } } =
+nftToMarketPlaceAssert o@{ mpScriptAddr } =
   [ assertAddrHasNewAsset mpScriptAddr o
   , assertAddrLacksOldAsset mpScriptAddr o
   ]
 
 nftToBuyerAssert :: PostBuyTestData -> Array (Contract () Unit)
-nftToBuyerAssert o@{ buyTestData: { buyerAddr, mpScriptAddr } } =
+nftToBuyerAssert o@{ buyerAddr, mpScriptAddr } =
   [ assertAddrHasNewAsset buyerAddr o, assertAddrLacksOldAsset mpScriptAddr o ]
 
-mkBuyTest :: BuyTestConfig -> Aff Unit
-mkBuyTest { mintParams, expectedShares, retBehaviour, postBuyAssertions } =
-  runBuyTest mintParams retBehaviour (mkShareAssertions expectedShares)
-    postBuyAssertions
+mkBuyTest
+  :: forall f
+   . WrappingAssertion f () PostBuyTestData
+  => BuyTestConfig f
+  -> Aff Unit
+mkBuyTest { mintParams, expectedShares, retBehaviour, assertions } =
+  runBuyTest mintParams retBehaviour
+    (\b -> mkShareAssertions expectedShares b /\ assertions)
 
 assertAddrHasNewAsset :: Address -> PostBuyTestData -> Contract () Unit
 assertAddrHasNewAsset addr { txData } =
@@ -159,30 +190,47 @@ assertAddrLacksOldAsset addr { txData } =
     <$> checkNftAtAddress txData.oldAsset addr
 
 mkShareAssertions
-  :: forall (r :: Row Type)
-   . ExpectedShares
+  :: ExpectedShares
   -> BuyTestData
-  -> Array (ContractWrapAssertion r)
+  -> Array (ContractWrapAssertion () PostBuyTestData)
 mkShareAssertions
-  { minMpGain, minSellerGain, minAuthorGain }
-  { sellerPayAddr, buyerAddr, authorPayAddr, mpScriptAddr, mintParams } =
+  e@{ minSellerGain, minAuthorGain }
+  b@{ sellerPayAddr, authorPayAddr } =
+  [ assertLovelaceIncAtAddr' "Author" authorPayAddr minAuthorGain
+  , assertLovelaceIncAtAddr' "Seller" sellerPayAddr minSellerGain
+  , buyerMarketplaceShareAssert e b
+  ]
+
+buyerMarketplaceShareAssert
+  :: ExpectedShares -> BuyTestData -> ContractWrapAssertion () PostBuyTestData
+buyerMarketplaceShareAssert
+  { minMpGain }
+  { buyerAddr, mpScriptAddr, mintParams: MintParams mintParams, sgNft }
+  contract = do
+  (TransactionOutput mpNftUtxo) <- liftedM "Could not find sgNft utxo"
+    $ findUtxoWithNft sgNft mpScriptAddr
   let
-    minBuyerLoss = Nat.toBigInt (unwrap mintParams).price
-  in
-    [ assertLovelaceIncAtAddr "Author" authorPayAddr minAuthorGain
-    , assertLovelaceIncAtAddr "Seller" sellerPayAddr minSellerGain
-    , assertLovelaceDecAtAddr "Buyer" buyerAddr minBuyerLoss
-    , assertLovelaceIncAtAddr "Marketplace" mpScriptAddr minMpGain
+    mpInit = valueToLovelace mpNftUtxo.amount
+
+    getBuyerExpectedLoss :: PostBuyTestData -> Contract () BigInt
+    getBuyerExpectedLoss { txHash } = do
+      (Transaction { body: TxBody { fee } }) <-
+        liftedM "Could not fetch buy transaction" $ getTxByHash txHash
+      let mpRemainder = mpInit - getLovelace (toPlutusCoin fee)
+      pure $ (Nat.toBigInt mintParams.price) - mpRemainder
+  contract `wrapAndAssert`
+    [ assertLovelaceIncAtAddr' "Marketplace" mpScriptAddr (minMpGain - mpInit)
+    , assertLovelaceDecAtAddr "Buyer" buyerAddr getBuyerExpectedLoss
     ]
 
 runBuyTest
-  :: forall (r :: Row Type)
-   . MintParams
+  :: forall (f :: Type)
+   . WrappingAssertion f () PostBuyTestData
+  => MintParams
   -> ReturnBehaviour
-  -> (BuyTestData -> Array (ContractWrapAssertion ()))
-  -> (PostBuyTestData -> Array (Contract () Unit))
+  -> (BuyTestData -> f)
   -> Aff Unit
-runBuyTest mintParams retBehaviour getAssertions getAfterAssertions = do
+runBuyTest mintParams retBehaviour getAssertions = do
   let
     distribution =
       ( withStakeKey privateStakeKey1
@@ -201,7 +249,7 @@ runBuyTest mintParams retBehaviour getAssertions getAfterAssertions = do
       sellerPkh <- liftedM "Cannot get seller pkh" ownPaymentPubKeyHash
       liftContractM "Could not get seller payment address" $
         payPubKeyHashEnterpriseAddress networkId sellerPkh
-    _ /\ nftData <- withKeyWallet seller do
+    sgNft /\ nftData <- withKeyWallet seller do
       cnft <- callMintCnft
       callMintSgNft cnft mintParams
     withKeyWallet buyer do
@@ -214,10 +262,9 @@ runBuyTest mintParams retBehaviour getAssertions getAfterAssertions = do
           , buyerAddr
           , mpScriptAddr
           , mintParams
+          , sgNft: sgNft
           }
-      withAssertions (getAssertions buyTestData) do
+      void $ withAssertions (getAssertions buyTestData) do
         txHash /\ txData <- marketplaceBuy' retBehaviour nftData
         awaitTxConfirmed txHash
-        sequence_ (getAfterAssertions { buyTestData, txData })
-
-      pure unit
+        pure $ merge buyTestData { txData, txHash }

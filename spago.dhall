@@ -34,6 +34,7 @@ You can edit this file as you like.
   , "partial"
   , "prelude"
   , "random"
+  , "record"
   , "spec"
   , "strings"
   , "text-encoding"
