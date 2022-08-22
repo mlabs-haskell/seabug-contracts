@@ -250,8 +250,8 @@ assertLovelaceChangeAtAddr
   -> (BigInt -> BigInt -> Boolean)
   -> Contract r a
   -> Contract r a
-assertLovelaceChangeAtAddr addrName addr getExpected comp contract =
-  flip (checkBalanceChangeAtAddr addrName addr) contract
+assertLovelaceChangeAtAddr addrName addr getExpected comp =
+  checkBalanceChangeAtAddr addrName addr
     \res valBefore valAfter ->
       do
         let actual = valueToLovelace valAfter - valueToLovelace valBefore
@@ -319,19 +319,21 @@ assertLossAtAddr' addrName addr minLoss contract =
 -- | assertion inhabiting this type should not call the contract more
 -- | than once, as other assertions need to be able to make this
 -- | assumption to succesfully compose.
-type ContractWrapAssertion r a = Contract r a -> Contract r a
+type ContractWrapAssertion (r :: Row Type) (a :: Type) =
+  Contract r a -> Contract r a
 
 -- | An assertion that only needs the result of the contract.
-type BasicAssertion r a b = a -> Contract r b
+type BasicAssertion (r :: Row Type) (a :: Type) (b :: Type) = a -> Contract r b
 
-type BasicAssertionMaker r a b = a -> Array (Contract r b)
+type BasicAssertionMaker (r :: Row Type) (a :: Type) (b :: Type) =
+  a -> Array (Contract r b)
 
 -- | Class to unify different methods of making assertions about a
 -- | contract under a single interface. Note that the typechecker may
 -- | need some help when using this class; try providing type
 -- | annotations for your assertions using the type aliases for the
 -- | instances of this class.
-class WrappingAssertion f r a where
+class WrappingAssertion (f :: Type) (r :: Row Type) (a :: Type) where
   -- | Wrap a contract in an assertion. The wrapped contract itself
   -- | becomes a contract which can be wrapped, allowing for
   -- | composition of assertions.

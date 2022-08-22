@@ -58,7 +58,7 @@ import TestM (TestPlanM)
 
 type BuyTestData = BuyTestData' ()
 
-type BuyTestData' r =
+type BuyTestData' (r :: Row Type) =
   { sellerPayAddr :: Address -- The enterprise address of the seller
   , buyerAddr :: Address -- The address used by the buyer
   , authorPayAddr :: Address -- The enterprise address of the author
@@ -80,7 +80,7 @@ type ExpectedShares =
   , minAuthorGain :: BigInt
   }
 
-type BuyTestConfig assertions =
+type BuyTestConfig (assertions :: Type) =
   { mintParams :: MintParams
   , expectedShares :: ExpectedShares
   , retBehaviour :: ReturnBehaviour
@@ -92,7 +92,9 @@ type BuyTestConfig assertions =
   , shouldError :: Boolean
   }
 
-buyTestConfig1 :: BuyTestConfig _
+type BasicBuyAssertGroup = PostBuyTestData -> Array (Contract () Unit)
+
+buyTestConfig1 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig1 =
   { mintParams: mintParams1
   , expectedShares:
@@ -109,7 +111,7 @@ buyTestConfig1 =
   , shouldError: false
   }
 
-buyTestConfig2 :: BuyTestConfig _
+buyTestConfig2 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig2 = buyTestConfig1
   { mintParams = mintParams2
   , expectedShares
@@ -120,7 +122,7 @@ buyTestConfig2 = buyTestConfig1
   , testName = "low marketplace share"
   }
 
-buyTestConfig3 :: BuyTestConfig _
+buyTestConfig3 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig3 = buyTestConfig1
   { mintParams = mintParams3
   , expectedShares
@@ -131,18 +133,18 @@ buyTestConfig3 = buyTestConfig1
   , testName = "low author share"
   }
 
-buyTestConfig4 :: BuyTestConfig _
+buyTestConfig4 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig4 = buyTestConfig2
   { mintParams = mintParams4, testName = "low author and marketplace shares" }
 
-buyTestConfig5 :: BuyTestConfig _
+buyTestConfig5 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig5 = buyTestConfig1
   { mintParams = mintParams5
   , testName = "price too low for min ada requirement"
   , shouldError = true
   }
 
-buyTestConfig6 :: BuyTestConfig _
+buyTestConfig6 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig6 = buyTestConfig1
   { mintParams = mintParams6
   , testName = "fractional shares (.5)"
@@ -153,7 +155,7 @@ buyTestConfig6 = buyTestConfig1
       }
   }
 
-buyTestConfig7 :: BuyTestConfig _
+buyTestConfig7 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig7 = buyTestConfig6
   { mintParams = mintParams7
   , testName = "fractional shares (.1)"
@@ -163,7 +165,7 @@ buyTestConfig7 = buyTestConfig6
       }
   }
 
-buyTestConfig8 :: BuyTestConfig _
+buyTestConfig8 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig8 = buyTestConfig6
   { mintParams = mintParams8
   , testName = "fractional shares (.9)"
@@ -173,7 +175,9 @@ buyTestConfig8 = buyTestConfig6
       }
   }
 
-addNftToBuyerVariants :: Array (BuyTestConfig _) -> Array (BuyTestConfig _)
+addNftToBuyerVariants
+  :: Array (BuyTestConfig BasicBuyAssertGroup)
+  -> Array (BuyTestConfig BasicBuyAssertGroup)
 addNftToBuyerVariants = Array.uncons >>> case _ of
   Nothing -> []
   Just { head: conf, tail: confs } ->
@@ -186,7 +190,9 @@ addNftToBuyerVariants = Array.uncons >>> case _ of
       : addNftToBuyerVariants confs
 
 authorNotSellerVariant
-  :: BuyTestConfig _ -> (ExpectedShares -> ExpectedShares) -> BuyTestConfig _
+  :: BuyTestConfig BasicBuyAssertGroup
+  -> (ExpectedShares -> ExpectedShares)
+  -> BuyTestConfig BasicBuyAssertGroup
 authorNotSellerVariant conf updateShares =
   conf
     { expectedShares = updateShares conf.expectedShares
