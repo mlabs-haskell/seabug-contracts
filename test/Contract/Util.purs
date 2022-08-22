@@ -19,6 +19,9 @@ module Test.Contract.Util
   , mintParams3
   , mintParams4
   , mintParams5
+  , mintParams6
+  , mintParams7
+  , mintParams8
   , plutipConfig
   , privateStakeKey1
   , privateStakeKey2
@@ -92,6 +95,18 @@ mintParams4 = modify
 
 mintParams5 :: MintParams
 mintParams5 = modify (_ { price = Nat.fromInt' 2 }) mintParams1
+
+-- | For testing rounding behaviour. The shares should be:
+-- |
+-- | 50_000_005 1000 / 10000 = 5_000_000.5
+mintParams6 :: MintParams
+mintParams6 = modify (_ { price = Nat.fromInt' 50_000_005 }) mintParams1
+
+mintParams7 :: MintParams
+mintParams7 = modify (_ { price = Nat.fromInt' 50_000_001 }) mintParams1
+
+mintParams8 :: MintParams
+mintParams8 = modify (_ { price = Nat.fromInt' 50_000_009 }) mintParams1
 
 callMintCnft
   ∷ forall (r :: Row Type). Contract r (CurrencySymbol /\ TokenName)

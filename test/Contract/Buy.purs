@@ -41,6 +41,9 @@ import Test.Contract.Util
   , mintParams3
   , mintParams4
   , mintParams5
+  , mintParams6
+  , mintParams7
+  , mintParams8
   , plutipConfig
   , privateStakeKey1
   , privateStakeKey2
@@ -62,6 +65,7 @@ type BuyTestData' r =
   , mpScriptAddr :: Address -- The address of the marketplace script
   , mintParams :: MintParams -- The params used to mint the bought nft
   , sgNft :: CurrencySymbol /\ TokenName -- The nft being bought
+  , nftToBuyer :: Boolean -- Whether the nft is being sent directly to the buyer
   | r
   }
 
@@ -138,6 +142,37 @@ buyTestConfig5 = buyTestConfig1
   , shouldError = true
   }
 
+buyTestConfig6 :: BuyTestConfig _
+buyTestConfig6 = buyTestConfig1
+  { mintParams = mintParams6
+  , testName = "fractional shares (.5)"
+  , expectedShares
+      { minMpGain = BigInt.fromInt $ 5_000_000
+      , minSellerGain = BigInt.fromInt $ 45_000_005
+      , minAuthorGain = BigInt.fromInt $ 45_000_005
+      }
+  }
+
+buyTestConfig7 :: BuyTestConfig _
+buyTestConfig7 = buyTestConfig6
+  { mintParams = mintParams7
+  , testName = "fractional shares (.1)"
+  , expectedShares
+      { minSellerGain = BigInt.fromInt $ 45_000_001
+      , minAuthorGain = BigInt.fromInt $ 45_000_001
+      }
+  }
+
+buyTestConfig8 :: BuyTestConfig _
+buyTestConfig8 = buyTestConfig6
+  { mintParams = mintParams8
+  , testName = "fractional shares (.9)"
+  , expectedShares
+      { minSellerGain = BigInt.fromInt $ 45_000_009
+      , minAuthorGain = BigInt.fromInt $ 45_000_009
+      }
+  }
+
 addNftToBuyerVariants :: Array (BuyTestConfig _) -> Array (BuyTestConfig _)
 addNftToBuyerVariants = Array.uncons >>> case _ of
   Nothing -> []
@@ -163,26 +198,45 @@ suite :: TestPlanM Unit
 suite =
   only $ group "Buy" do
     let
-      tests = [ buyTestConfig5 ] <> addNftToBuyerVariants
-        [ buyTestConfig1
-        , authorNotSellerVariant buyTestConfig1 _
-            { minSellerGain = BigInt.fromInt $ 80 * 1000000
-            , minAuthorGain = BigInt.fromInt $ 10 * 1000000
+      tests =
+        [ buyTestConfig5
+        -- Specify rounding behaviour
+        , buyTestConfig6
+        , authorNotSellerVariant buyTestConfig6 _
+            { minSellerGain = BigInt.fromInt $ 40_000_005
+            , minAuthorGain = BigInt.fromInt $ 5_000_000
             }
-        , buyTestConfig2
-        , authorNotSellerVariant buyTestConfig2 _
-            { minSellerGain = BigInt.fromInt $ 90 * 1000000
-            , minAuthorGain = BigInt.fromInt $ 10 * 1000000
+        , buyTestConfig7
+        , authorNotSellerVariant buyTestConfig7 _
+            { minSellerGain = BigInt.fromInt $ 40_000_001
+            , minAuthorGain = BigInt.fromInt $ 5_000_000
             }
-        , buyTestConfig3
-        , authorNotSellerVariant buyTestConfig3 _
-            { minSellerGain = BigInt.fromInt $ 90 * 1000000
-            , minAuthorGain = BigInt.fromInt $ 0
+        , buyTestConfig8
+        , authorNotSellerVariant buyTestConfig8 _
+            { minSellerGain = BigInt.fromInt $ 40_000_009
+            , minAuthorGain = BigInt.fromInt $ 5_000_000
             }
-        , buyTestConfig4
-        , authorNotSellerVariant buyTestConfig4 _
-            { minAuthorGain = BigInt.fromInt $ 0 }
-        ]
+        ] <>
+          addNftToBuyerVariants
+            [ buyTestConfig1
+            , authorNotSellerVariant buyTestConfig1 _
+                { minSellerGain = BigInt.fromInt $ 80 * 1000000
+                , minAuthorGain = BigInt.fromInt $ 10 * 1000000
+                }
+            , buyTestConfig2
+            , authorNotSellerVariant buyTestConfig2 _
+                { minSellerGain = BigInt.fromInt $ 90 * 1000000
+                , minAuthorGain = BigInt.fromInt $ 10 * 1000000
+                }
+            , buyTestConfig3
+            , authorNotSellerVariant buyTestConfig3 _
+                { minSellerGain = BigInt.fromInt $ 90 * 1000000
+                , minAuthorGain = BigInt.fromInt $ 0
+                }
+            , buyTestConfig4
+            , authorNotSellerVariant buyTestConfig4 _
+                { minAuthorGain = BigInt.fromInt $ 0 }
+            ]
     for_ tests mkBuyTest
 
 mkBuyTest
@@ -235,21 +289,31 @@ buyerMarketplaceShareAssert
   :: ExpectedShares -> BuyTestData -> ContractWrapAssertion () PostBuyTestData
 buyerMarketplaceShareAssert
   { minMpGain }
-  { buyerAddr, mpScriptAddr, mintParams: MintParams mintParams, sgNft }
+  { buyerAddr
+  , mpScriptAddr
+  , mintParams: MintParams mintParams
+  , sgNft
+  , nftToBuyer
+  }
   contract = do
   (TransactionOutput mpNftUtxo) <- liftedM "Could not find sgNft utxo"
     $ findUtxoWithNft sgNft mpScriptAddr
   let
     mpInit = valueToLovelace mpNftUtxo.amount
+    price = Nat.toBigInt mintParams.price
 
     getBuyerExpectedLoss :: PostBuyTestData -> Contract () BigInt
     getBuyerExpectedLoss { txHash } = do
       (Transaction { body: TxBody { fee } }) <-
         liftedM "Could not fetch buy transaction" $ getTxByHash txHash
-      let mpRemainder = mpInit - getLovelace (toPlutusCoin fee)
-      pure $ (Nat.toBigInt mintParams.price) - mpRemainder
+      let
+        feeLovelace = getLovelace (toPlutusCoin fee)
+        mpRemainder = mpInit - feeLovelace
+      pure $ if nftToBuyer then price - mpRemainder else price + feeLovelace
+
+    mpExp = if nftToBuyer then (minMpGain - mpInit) else minMpGain
   contract `wrapAndAssert`
-    [ assertLovelaceIncAtAddr' "Marketplace" mpScriptAddr (minMpGain - mpInit)
+    [ assertLovelaceIncAtAddr' "Marketplace" mpScriptAddr mpExp
     , assertLovelaceDecAtAddr "Buyer" buyerAddr getBuyerExpectedLoss
     ]
 
@@ -306,6 +370,9 @@ runBuyTest mintParams retBehaviour authorIsSeller getAssertions = do
           , mpScriptAddr
           , mintParams
           , sgNft
+          , nftToBuyer: case retBehaviour of
+              ToCaller -> true
+              _ -> false
           }
       void $ withAssertions (getAssertions buyTestData) do
         txHash /\ txData <- marketplaceBuy' retBehaviour nftData
