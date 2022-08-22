@@ -30,8 +30,8 @@ import Test.Contract.Util
   ( class WrappingAssertion
   , ContractWrapAssertion
   , assertContract
-  , assertLovelaceDecAtAddr
-  , assertLovelaceIncAtAddr'
+  , assertLossAtAddr
+  , assertGainAtAddr'
   , callMintCnft
   , callMintSgNft
   , checkNftAtAddress
@@ -280,8 +280,8 @@ mkShareAssertions
 mkShareAssertions
   e@{ minSellerGain, minAuthorGain }
   b@{ sellerPayAddr, authorPayAddr } =
-  [ assertLovelaceIncAtAddr' "Author" authorPayAddr minAuthorGain
-  , assertLovelaceIncAtAddr' "Seller" sellerPayAddr minSellerGain
+  [ assertGainAtAddr' "Author" authorPayAddr minAuthorGain
+  , assertGainAtAddr' "Seller" sellerPayAddr minSellerGain
   , buyerMarketplaceShareAssert e b
   ]
 
@@ -313,8 +313,8 @@ buyerMarketplaceShareAssert
 
     mpExp = if nftToBuyer then (minMpGain - mpInit) else minMpGain
   contract `wrapAndAssert`
-    [ assertLovelaceIncAtAddr' "Marketplace" mpScriptAddr mpExp
-    , assertLovelaceDecAtAddr "Buyer" buyerAddr getBuyerExpectedLoss
+    [ assertGainAtAddr' "Marketplace" mpScriptAddr mpExp
+    , assertLossAtAddr "Buyer" buyerAddr getBuyerExpectedLoss
     ]
 
 runBuyTest

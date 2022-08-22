@@ -4,10 +4,10 @@ module Test.Contract.Util
   , ContractWrapAssertion
   , assertContract
   , assertLovelaceChangeAtAddr
-  , assertLovelaceDecAtAddr
-  , assertLovelaceDecAtAddr'
-  , assertLovelaceIncAtAddr
-  , assertLovelaceIncAtAddr'
+  , assertLossAtAddr
+  , assertLossAtAddr'
+  , assertGainAtAddr
+  , assertGainAtAddr'
   , callMintCnft
   , callMintSgNft
   , checkBalanceChangeAtAddr
@@ -266,54 +266,54 @@ assertLovelaceChangeAtAddr addrName addr getExpected comp contract =
           $ comp actual expected
         pure res
 
--- | Requires that at least the computed amount of lovelace was gained
--- | at the address by calling the contract.
-assertLovelaceIncAtAddr
+-- | Requires that the computed amount of lovelace was gained at the
+-- | address by calling the contract.
+assertGainAtAddr
   :: forall (r :: Row Type) (a :: Type)
    . String
   -> Address
   -> (a -> Contract r BigInt)
   -> Contract r a
   -> Contract r a
-assertLovelaceIncAtAddr addrName addr getMinGain contract =
-  assertLovelaceChangeAtAddr addrName addr getMinGain (>=) contract
+assertGainAtAddr addrName addr getMinGain contract =
+  assertLovelaceChangeAtAddr addrName addr getMinGain (==) contract
 
--- | Requires that at least the passed amount of lovelace was gained
--- | at the address by calling the contract.
-assertLovelaceIncAtAddr'
+-- | Requires that the passed amount of lovelace was gained at the
+-- | address by calling the contract.
+assertGainAtAddr'
   :: forall (r :: Row Type) (a :: Type)
    . String
   -> Address
   -> BigInt
   -> Contract r a
   -> Contract r a
-assertLovelaceIncAtAddr' addrName addr minGain contract =
-  assertLovelaceIncAtAddr addrName addr (const $ pure minGain) contract
+assertGainAtAddr' addrName addr minGain contract =
+  assertGainAtAddr addrName addr (const $ pure minGain) contract
 
--- | Requires that at least the computed amount of lovelace was lost at
--- | the address by calling the contract.
-assertLovelaceDecAtAddr
+-- | Requires that the computed amount of lovelace was lost at the
+-- | address by calling the contract.
+assertLossAtAddr
   :: forall (r :: Row Type) (a :: Type)
    . String
   -> Address
   -> (a -> Contract r BigInt)
   -> Contract r a
   -> Contract r a
-assertLovelaceDecAtAddr addrName addr getMinLoss contract =
-  assertLovelaceChangeAtAddr addrName addr (map negate <<< getMinLoss) (<=)
+assertLossAtAddr addrName addr getMinLoss contract =
+  assertLovelaceChangeAtAddr addrName addr (map negate <<< getMinLoss) (==)
     contract
 
--- | Requires that at least the passed amount of lovelace was lost at
--- | the address by calling the contract.
-assertLovelaceDecAtAddr'
+-- | Requires that the passed amount of lovelace was lost at the
+-- | address by calling the contract.
+assertLossAtAddr'
   :: forall (r :: Row Type) (a :: Type)
    . String
   -> Address
   -> BigInt
   -> Contract r a
   -> Contract r a
-assertLovelaceDecAtAddr' addrName addr minLoss contract =
-  assertLovelaceDecAtAddr addrName addr (const (pure minLoss)) contract
+assertLossAtAddr' addrName addr minLoss contract =
+  assertLossAtAddr addrName addr (const (pure minLoss)) contract
 
 -- | An assertion that can control when the contract is run. The
 -- | assertion inhabiting this type should not call the contract more
