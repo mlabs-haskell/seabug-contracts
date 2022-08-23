@@ -18,6 +18,7 @@ module Test.Contract.Util
   , checkUtxoWithDatum
   , class WrappingAssertion
   , findM
+  , findUtxo
   , findUtxoWithDatum
   , findUtxoWithNft
   , mintParams1
@@ -28,6 +29,7 @@ module Test.Contract.Util
   , mintParams6
   , mintParams7
   , mintParams8
+  , mkExpectedVsActual
   , plutipConfig
   , privateStakeKey1
   , privateStakeKey2
@@ -490,9 +492,17 @@ findUtxoWithDatum
   -> a
   -> Address
   -> Contract r (Maybe TransactionOutput)
-findUtxoWithDatum utxoName datum addr = do
+findUtxoWithDatum utxoName datum addr =
+  findUtxo addr (checkOutputHasDatum utxoName datum (==))
+
+findUtxo
+  :: forall (r :: Row Type)
+   . Address
+  -> (TransactionOutput -> Contract r Boolean)
+  -> Contract r (Maybe TransactionOutput)
+findUtxo addr p = do
   utxos <- liftedM "Could not get utxos" $ map unwrap <$> utxosAt addr
-  findM (checkOutputHasDatum utxoName datum (==)) utxos
+  findM p utxos
 
 findM
   :: forall (a :: Type) (f :: Type -> Type) (m :: Type -> Type)

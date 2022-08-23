@@ -24,7 +24,12 @@ import Mote (group, only, skip, test)
 import Plutus.Conversion (toPlutusCoin)
 import Record (merge)
 import Seabug.Contract.Buy (marketplaceBuy')
-import Seabug.Contract.Util (ReturnBehaviour(..), SeabugTxData, modify)
+import Seabug.Contract.Util
+  ( ReturnBehaviour(..)
+  , SeabugTxData
+  , minAdaOnlyUTxOValue
+  , modify
+  )
 import Seabug.MarketPlace (marketplaceValidatorAddr)
 import Seabug.Types (MintParams(..))
 import Test.Contract.Util
@@ -36,7 +41,8 @@ import Test.Contract.Util
   , callMintCnft
   , callMintSgNft
   , checkNftAtAddress
-  , checkUtxoWithDatum
+  , checkOutputHasDatum
+  , findUtxo
   , findUtxoWithNft
   , mintParams1
   , mintParams2
@@ -77,9 +83,9 @@ type PostBuyTestData = BuyTestData'
   )
 
 type ExpectedShares =
-  { minMpGain :: BigInt
-  , minSellerGain :: BigInt
-  , minAuthorGain :: BigInt
+  { mpGain :: BigInt
+  , sellerGain :: BigInt
+  , authorGain :: BigInt
   }
 
 type BuyTestConfig (assertions :: Type) =
@@ -100,9 +106,9 @@ buyTestConfig1 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig1 =
   { mintParams: mintParams1
   , expectedShares:
-      { minMpGain: BigInt.fromInt $ 10 * 1000000
-      , minSellerGain: BigInt.fromInt $ 90 * 1000000
-      , minAuthorGain: BigInt.fromInt $ 90 * 1000000
+      { mpGain: BigInt.fromInt $ 10 * 1000000
+      , sellerGain: BigInt.fromInt $ 80 * 1000000
+      , authorGain: BigInt.fromInt $ 10 * 1000000
       }
   , retBehaviour: ToMarketPlace
   , authorIsSeller: true
@@ -117,9 +123,9 @@ buyTestConfig2 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig2 = buyTestConfig1
   { mintParams = mintParams2
   , expectedShares
-      { minMpGain = BigInt.fromInt 0
-      , minSellerGain = BigInt.fromInt $ 100 * 1000000
-      , minAuthorGain = BigInt.fromInt $ 100 * 1000000
+      { mpGain = BigInt.fromInt 0
+      , sellerGain = BigInt.fromInt $ 90 * 1000000
+      , authorGain = BigInt.fromInt $ 10 * 1000000
       }
   , testName = "low marketplace share"
   }
@@ -128,16 +134,23 @@ buyTestConfig3 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig3 = buyTestConfig1
   { mintParams = mintParams3
   , expectedShares
-      { minMpGain = BigInt.fromInt $ 10 * 1000000
-      , minSellerGain = BigInt.fromInt $ 90 * 1000000
-      , minAuthorGain = BigInt.fromInt $ 90 * 1000000
+      { mpGain = BigInt.fromInt $ 10 * 1000000
+      , sellerGain = BigInt.fromInt $ 90 * 1000000
+      , authorGain = BigInt.fromInt 0
       }
   , testName = "low author share"
   }
 
 buyTestConfig4 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig4 = buyTestConfig2
-  { mintParams = mintParams4, testName = "low author and marketplace shares" }
+  { mintParams = mintParams4
+  , testName = "low author and marketplace shares"
+  , expectedShares
+      { mpGain = BigInt.fromInt 0
+      , sellerGain = BigInt.fromInt $ 100 * 1000000
+      , authorGain = BigInt.fromInt 0
+      }
+  }
 
 buyTestConfig5 :: BuyTestConfig BasicBuyAssertGroup
 buyTestConfig5 = buyTestConfig1
@@ -151,9 +164,9 @@ buyTestConfig6 = buyTestConfig1
   { mintParams = mintParams6
   , testName = "fractional shares (.5)"
   , expectedShares
-      { minMpGain = BigInt.fromInt $ 5_000_000
-      , minSellerGain = BigInt.fromInt $ 45_000_005
-      , minAuthorGain = BigInt.fromInt $ 45_000_005
+      { mpGain = BigInt.fromInt 5_000_000
+      , sellerGain = BigInt.fromInt 40_000_005
+      , authorGain = BigInt.fromInt 5_000_000
       }
   }
 
@@ -162,8 +175,8 @@ buyTestConfig7 = buyTestConfig6
   { mintParams = mintParams7
   , testName = "fractional shares (.1)"
   , expectedShares
-      { minSellerGain = BigInt.fromInt $ 45_000_001
-      , minAuthorGain = BigInt.fromInt $ 45_000_001
+      { sellerGain = BigInt.fromInt 40_000_001
+      , authorGain = BigInt.fromInt 5_000_000
       }
   }
 
@@ -172,33 +185,36 @@ buyTestConfig8 = buyTestConfig6
   { mintParams = mintParams8
   , testName = "fractional shares (.9)"
   , expectedShares
-      { minSellerGain = BigInt.fromInt $ 45_000_009
-      , minAuthorGain = BigInt.fromInt $ 45_000_009
+      { sellerGain = BigInt.fromInt 40_000_009
+      , authorGain = BigInt.fromInt 5_000_000
       }
   }
+
+addVariants
+  :: (BuyTestConfig BasicBuyAssertGroup -> BuyTestConfig BasicBuyAssertGroup)
+  -> Array (BuyTestConfig BasicBuyAssertGroup)
+  -> Array (BuyTestConfig BasicBuyAssertGroup)
+addVariants vary = Array.uncons >>> case _ of
+  Nothing -> []
+  Just { head: conf, tail: confs } ->
+    conf : vary conf : addVariants vary confs
 
 addNftToBuyerVariants
   :: Array (BuyTestConfig BasicBuyAssertGroup)
   -> Array (BuyTestConfig BasicBuyAssertGroup)
-addNftToBuyerVariants = Array.uncons >>> case _ of
-  Nothing -> []
-  Just { head: conf, tail: confs } ->
-    conf
-      : conf
-          { retBehaviour = ToCaller
-          , assertions = nftToBuyerAssert
-          , testName = conf.testName <> ", nft to buyer"
-          }
-      : addNftToBuyerVariants confs
-
-authorNotSellerVariant
-  :: BuyTestConfig BasicBuyAssertGroup
-  -> (ExpectedShares -> ExpectedShares)
-  -> BuyTestConfig BasicBuyAssertGroup
-authorNotSellerVariant conf updateShares =
+addNftToBuyerVariants = addVariants \conf ->
   conf
-    { expectedShares = updateShares conf.expectedShares
-    , authorIsSeller = false
+    { retBehaviour = ToCaller
+    , assertions = nftToBuyerAssert
+    , testName = conf.testName <> ", nft to buyer"
+    }
+
+addAuthorNotSellerVariants
+  :: Array (BuyTestConfig BasicBuyAssertGroup)
+  -> Array (BuyTestConfig BasicBuyAssertGroup)
+addAuthorNotSellerVariants = addVariants \conf ->
+  conf
+    { authorIsSeller = false
     , testName = conf.testName <> ", author is not seller"
     }
 
@@ -207,44 +223,21 @@ suite =
   only $ group "Buy" do
     let
       tests =
-        [ buyTestConfig5
-        -- Specify rounding behaviour
-        , buyTestConfig6
-        , authorNotSellerVariant buyTestConfig6 _
-            { minSellerGain = BigInt.fromInt $ 40_000_005
-            , minAuthorGain = BigInt.fromInt $ 5_000_000
-            }
-        , buyTestConfig7
-        , authorNotSellerVariant buyTestConfig7 _
-            { minSellerGain = BigInt.fromInt $ 40_000_001
-            , minAuthorGain = BigInt.fromInt $ 5_000_000
-            }
-        , buyTestConfig8
-        , authorNotSellerVariant buyTestConfig8 _
-            { minSellerGain = BigInt.fromInt $ 40_000_009
-            , minAuthorGain = BigInt.fromInt $ 5_000_000
-            }
-        ] <>
-          addNftToBuyerVariants
-            [ buyTestConfig1
-            , authorNotSellerVariant buyTestConfig1 _
-                { minSellerGain = BigInt.fromInt $ 80 * 1000000
-                , minAuthorGain = BigInt.fromInt $ 10 * 1000000
-                }
-            , buyTestConfig2
-            , authorNotSellerVariant buyTestConfig2 _
-                { minSellerGain = BigInt.fromInt $ 90 * 1000000
-                , minAuthorGain = BigInt.fromInt $ 10 * 1000000
-                }
-            , buyTestConfig3
-            , authorNotSellerVariant buyTestConfig3 _
-                { minSellerGain = BigInt.fromInt $ 90 * 1000000
-                , minAuthorGain = BigInt.fromInt $ 0
-                }
-            , buyTestConfig4
-            , authorNotSellerVariant buyTestConfig4 _
-                { minAuthorGain = BigInt.fromInt $ 0 }
+        [ buyTestConfig5 ]
+          <> addAuthorNotSellerVariants
+            [
+              -- Specify rounding behaviour
+              buyTestConfig6
+            , buyTestConfig7
+            , buyTestConfig8
             ]
+          <>
+            (addNftToBuyerVariants <<< addAuthorNotSellerVariants)
+              [ buyTestConfig1
+              , buyTestConfig2
+              , buyTestConfig3
+              , buyTestConfig4
+              ]
     for_ tests mkBuyTest
 
 mkBuyTest
@@ -253,14 +246,14 @@ mkBuyTest
   => BuyTestConfig f
   -> TestPlanM Unit
 mkBuyTest
-  conf@{ mintParams, expectedShares, retBehaviour, assertions, authorIsSeller } =
+  conf@{ mintParams, retBehaviour, assertions, authorIsSeller } =
   (if conf.skip then skip else if conf.only then only else identity)
     $ test conf.testName
     $ (if conf.shouldError then expectError else identity)
     $ runBuyTest mintParams retBehaviour authorIsSeller
         \b ->
           -- TODO: check tx metadata
-          mkShareAssertions expectedShares b /\ mkDatumAssertions /\ assertions
+          mkUtxoAssertions conf b /\ assertions
 
 nftToMarketPlaceAssert :: PostBuyTestData -> Array (Contract () Unit)
 nftToMarketPlaceAssert o@{ mpScriptAddr } =
@@ -283,38 +276,41 @@ assertAddrLacksOldAsset addr { txData } =
     =<< not
     <$> checkNftAtAddress txData.oldAsset addr
 
-mkDatumAssertions :: PostBuyTestData -> Array (Contract () Unit)
-mkDatumAssertions
-  { sellerPayAddr, authorPayAddr, mpScriptAddr, txData: { oldAsset } } =
-  let
-    datum = Datum $ toData oldAsset
-  in
-    -- TODO: check that these utxos have the expected payment amounts
-    -- TODO: account for cases where shares were too low
-    [ assertContract "Seller did not have payment utxo with datum" =<<
-        checkUtxoWithDatum "seller" datum sellerPayAddr
-    , assertContract "Author did not have payment utxo with datum" =<<
-        checkUtxoWithDatum "author" datum authorPayAddr
-    , assertContract "Marketplace did not have payment utxo with datum" =<<
-        checkUtxoWithDatum "marketplace" datum mpScriptAddr
-    ]
-
-mkShareAssertions
-  :: ExpectedShares
+mkUtxoAssertions
+  :: forall f
+   . WrappingAssertion f () PostBuyTestData
+  => BuyTestConfig f
   -> BuyTestData
-  -> Array (ContractWrapAssertion () PostBuyTestData)
-mkShareAssertions
-  e@{ minSellerGain, minAuthorGain }
+  -> ContractWrapAssertion () PostBuyTestData
+mkUtxoAssertions
+  { authorIsSeller, expectedShares: e@{ sellerGain, authorGain } }
   b@{ sellerPayAddr, authorPayAddr } =
-  [ assertGainAtAddr' "Author" authorPayAddr minAuthorGain
-  , assertGainAtAddr' "Seller" sellerPayAddr minSellerGain
-  , buyerMarketplaceShareAssert e b
-  ]
+  let
+    assertSellerChange = assertGainAtAddr' "Seller" sellerPayAddr
+      $ if authorIsSeller then sellerGain + authorGain else sellerGain
+    assertAuthorChange =
+      if authorIsSeller then identity
+      else assertGainAtAddr' "Author" authorPayAddr authorGain
+    assertSellerPayment = assertPaymentUtxo "Seller" sellerPayAddr sellerGain
+    assertAuthorPayment =
+      if authorIsSeller then const (pure unit)
+      else assertPaymentUtxo "Author" authorPayAddr authorGain
+  in
+    withAssertions
+      $
+        [ assertSellerChange
+        , assertAuthorChange
+        , buyerMarketplaceUtxoAssert e b
+        ]
+      /\
+        [ assertAuthorPayment
+        , assertSellerPayment
+        ]
 
-buyerMarketplaceShareAssert
+buyerMarketplaceUtxoAssert
   :: ExpectedShares -> BuyTestData -> ContractWrapAssertion () PostBuyTestData
-buyerMarketplaceShareAssert
-  { minMpGain }
+buyerMarketplaceUtxoAssert
+  { mpGain }
   { buyerAddr
   , mpScriptAddr
   , mintParams: MintParams mintParams
@@ -337,11 +333,26 @@ buyerMarketplaceShareAssert
         mpRemainder = mpInit - feeLovelace
       pure $ if nftToBuyer then price - mpRemainder else price + feeLovelace
 
-    mpExp = if nftToBuyer then (minMpGain - mpInit) else minMpGain
-  contract `wrapAndAssert`
-    [ assertGainAtAddr' "Marketplace" mpScriptAddr mpExp
-    , assertLossAtAddr "Buyer" buyerAddr getBuyerExpectedLoss
-    ]
+    mpExp = if nftToBuyer then (mpGain - mpInit) else mpGain
+  wrapAndAssert contract
+    $
+      [ assertGainAtAddr' "Marketplace" mpScriptAddr mpExp
+      , assertLossAtAddr "Buyer" buyerAddr getBuyerExpectedLoss
+      ]
+    /\
+      [ assertPaymentUtxo "Marketplace" mpScriptAddr mpGain
+      ]
+
+assertPaymentUtxo
+  :: String -> Address -> BigInt -> PostBuyTestData -> Contract () Unit
+assertPaymentUtxo name addr payment { txData: { oldAsset } }
+  | payment < minAdaOnlyUTxOValue = pure unit
+  | otherwise =
+      assertContract (name <> " did not have payment utxo with datum")
+        =<< isJust
+        <$> findUtxo addr \o@(TransactionOutput utxo) ->
+          checkOutputHasDatum name (Datum $ toData oldAsset) (==) o <#>
+            (_ && valueToLovelace utxo.amount == payment)
 
 runBuyTest
   :: forall (f :: Type)

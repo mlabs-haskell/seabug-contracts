@@ -14,7 +14,7 @@ main :: Effect Unit
 main = launchAff_ $ interpretWithConfig
   -- we don't want to exit because we need to clean up after failure by
   -- timeout (something likely to happen with plutip tests)
-  defaultConfig { timeout = Just $ wrap 30_000.0, exit = false }
+  defaultConfig { timeout = Just $ wrap 60_000.0, exit = false }
   plutipTestPlan
 
 plutipTestPlan :: TestPlanM Unit
