@@ -5,6 +5,7 @@ import Contract.Prelude
 import Contract.Address (Address, getWalletAddress)
 import Contract.Monad (Contract, liftedM)
 import Contract.Numeric.Natural as Nat
+import Contract.PlutusData (Datum(..), toData)
 import Contract.Test.Plutip (runPlutipContract, withKeyWallet, withStakeKey)
 import Contract.Transaction
   ( Transaction(..)
@@ -30,11 +31,12 @@ import Test.Contract.Util
   ( class WrappingAssertion
   , ContractWrapAssertion
   , assertContract
-  , assertLossAtAddr
   , assertGainAtAddr'
+  , assertLossAtAddr
   , callMintCnft
   , callMintSgNft
   , checkNftAtAddress
+  , checkUtxoWithDatum
   , findUtxoWithNft
   , mintParams1
   , mintParams2
@@ -256,7 +258,9 @@ mkBuyTest
     $ test conf.testName
     $ (if conf.shouldError then expectError else identity)
     $ runBuyTest mintParams retBehaviour authorIsSeller
-        (\b -> mkShareAssertions expectedShares b /\ assertions)
+        \b ->
+          -- TODO: check tx metadata
+          mkShareAssertions expectedShares b /\ mkDatumAssertions /\ assertions
 
 nftToMarketPlaceAssert :: PostBuyTestData -> Array (Contract () Unit)
 nftToMarketPlaceAssert o@{ mpScriptAddr } =
@@ -278,6 +282,22 @@ assertAddrLacksOldAsset addr { txData } =
   assertContract "Address contained old sgNft"
     =<< not
     <$> checkNftAtAddress txData.oldAsset addr
+
+mkDatumAssertions :: PostBuyTestData -> Array (Contract () Unit)
+mkDatumAssertions
+  { sellerPayAddr, authorPayAddr, mpScriptAddr, txData: { oldAsset } } =
+  let
+    datum = Datum $ toData oldAsset
+  in
+    -- TODO: check that these utxos have the expected payment amounts
+    -- TODO: account for cases where shares were too low
+    [ assertContract "Seller did not have payment utxo with datum" =<<
+        checkUtxoWithDatum "seller" datum sellerPayAddr
+    , assertContract "Author did not have payment utxo with datum" =<<
+        checkUtxoWithDatum "author" datum authorPayAddr
+    , assertContract "Marketplace did not have payment utxo with datum" =<<
+        checkUtxoWithDatum "marketplace" datum mpScriptAddr
+    ]
 
 mkShareAssertions
   :: ExpectedShares
@@ -354,7 +374,7 @@ runBuyTest mintParams retBehaviour authorIsSeller getAssertions = do
   runPlutipContract plutipConfig distribution \(author /\ seller /\ buyer) -> do
     authorPayAddr <- walletEnterpriseAddress "author" author
     sellerPayAddr <- walletEnterpriseAddress "seller" seller
-    initialSgNft /\ initialNftData <- withKeyWallet author do
+    { sgNft: initialSgNft, nftData: initialNftData } <- withKeyWallet author do
       cnft <- callMintCnft
       callMintSgNft cnft mintParams
     sgNft /\ nftData <-

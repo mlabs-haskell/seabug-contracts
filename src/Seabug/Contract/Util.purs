@@ -5,14 +5,14 @@ module Seabug.Contract.Util
   , mkChangeNftIdTxData
   , modify
   , seabugTxToMarketTx
-  , setSeabugMetadata
+  , getSeabugMetadata
   ) where
 
 import Contract.Prelude
 
 import Contract.Address (getNetworkId)
 import Contract.AuxiliaryData (setTxMetadata)
-import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
+import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.PlutusData
   ( Datum(Datum)
@@ -128,10 +128,10 @@ seabugTxToMarketTx name retBehaviour mkTxData nftData = do
           ToCaller -> mempty -- Balancing will return the token to the caller
 
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookups constraints
-  txWithMetadata <-
-    setSeabugMetadata (modify (_ { nftId = txData.newNft }) nftData)
-      (fst txData.newAsset)
-      txDatumsRedeemerTxIns
+  metadata <- liftContractE $ getSeabugMetadata
+    (modify (_ { nftId = txData.newNft }) nftData)
+    (fst txData.newAsset)
+  txWithMetadata <- setTxMetadata txDatumsRedeemerTxIns metadata
 
   signedTx <- liftedE
     ( lmap
@@ -216,22 +216,21 @@ minAdaOnlyUTxOValue :: BigInt
 minAdaOnlyUTxOValue = BigInt.fromInt 2_000_000
 
 -- | Set metadata on the transaction for the given NFT
-setSeabugMetadata
+getSeabugMetadata
   :: forall (r :: Row Type)
    . NftData
   -> CurrencySymbol -- | The currency symbol of the self-governed nft
-  -> UnattachedUnbalancedTx
-  -> Contract r UnattachedUnbalancedTx
-setSeabugMetadata (NftData nftData) sgNftCurr tx = do
+  -> Either String SeabugMetadata
+getSeabugMetadata (NftData nftData) sgNftCurr = do
   let
     nftCollection = unwrap nftData.nftCollection
     nftId = unwrap nftData.nftId
-    natToShare nat = liftContractM "Invalid share"
+    natToShare nat = note "Invalid share"
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
-  setTxMetadata tx $ SeabugMetadata
+  pure $ SeabugMetadata
     { policyId: sgNftCurr
     , mintPolicy: "V1"
     , collectionNftCS: nftCollection.collectionNftCs

@@ -3,16 +3,22 @@ module Test.Contract.Util
   , BasicAssertionMaker
   , ContractWrapAssertion
   , assertContract
-  , assertLovelaceChangeAtAddr
-  , assertLossAtAddr
-  , assertLossAtAddr'
   , assertGainAtAddr
   , assertGainAtAddr'
+  , assertLossAtAddr
+  , assertLossAtAddr'
+  , assertLovelaceChangeAtAddr
+  , assertOutputHasDatum
+  , assertTxHasMetadata
   , callMintCnft
   , callMintSgNft
   , checkBalanceChangeAtAddr
   , checkNftAtAddress
+  , checkOutputHasDatum
+  , checkUtxoWithDatum
   , class WrappingAssertion
+  , findM
+  , findUtxoWithDatum
   , findUtxoWithNft
   , mintParams1
   , mintParams2
@@ -45,8 +51,16 @@ import Contract.Address
 import Contract.Config (PrivateStakeKey)
 import Contract.Monad (Contract, liftContractM, liftedM)
 import Contract.Numeric.Natural as Nat
+import Contract.PlutusData (class FromData, fromData, getDatumByHash)
 import Contract.Test.Plutip (PlutipConfig)
-import Contract.Transaction (TransactionOutput(..), awaitTxConfirmed)
+import Contract.Transaction
+  ( AuxiliaryData(..)
+  , Transaction(..)
+  , TransactionHash
+  , TransactionOutput(..)
+  , awaitTxConfirmed
+  , getTxByHash
+  )
 import Contract.Utxos (utxosAt)
 import Contract.Value
   ( CurrencySymbol
@@ -57,6 +71,7 @@ import Contract.Value
   , valueToCoin
   )
 import Contract.Wallet (KeyWallet, privateKeyFromBytes, withKeyWallet)
+import Control.Monad.Except (catchError)
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Data.Map as Map
@@ -64,11 +79,14 @@ import Data.Monoid.Endo (Endo(..))
 import Data.Newtype (ala)
 import Data.UInt as UInt
 import Effect.Exception (throw)
+import Metadata.FromMetadata (class FromMetadata, fromMetadata)
+import Metadata.MetadataType (class MetadataType, metadataLabel)
 import Partial.Unsafe (unsafePartial)
 import Seabug.Contract.CnftMint (mintCnft)
 import Seabug.Contract.Mint (mintWithCollection')
 import Seabug.Contract.Util (modify)
 import Seabug.Types (MintCnftParams(..), MintParams, NftData)
+import Type.Proxy (Proxy(..))
 import Types.BigNum as BigNum
 import Types.RawBytes (hexToRawBytes)
 
@@ -130,15 +148,18 @@ callMintSgNft
   :: forall (r :: Row Type)
    . Tuple CurrencySymbol TokenName
   -> MintParams
-  -> Contract r ((CurrencySymbol /\ TokenName) /\ NftData)
+  -> Contract r
+       { sgNft :: (CurrencySymbol /\ TokenName)
+       , nftData :: NftData
+       , txHash :: TransactionHash
+       }
 callMintSgNft cnft mintParams = do
   log "Minting sgNft..."
-  sgNftTxHash /\ sgNft /\ nftData <- mintWithCollection' cnft mintParams
-  log $ "Waiting for confirmation of nft transaction: " <> show
-    sgNftTxHash
-  awaitTxConfirmed sgNftTxHash
-  log $ "Nft transaction confirmed: " <> show sgNftTxHash
-  pure $ sgNft /\ nftData
+  txHash /\ sgNft /\ nftData <- mintWithCollection' cnft mintParams
+  log $ "Waiting for confirmation of nft transaction: " <> show txHash
+  awaitTxConfirmed txHash
+  log $ "Nft transaction confirmed: " <> show txHash
+  pure { sgNft, nftData, txHash }
 
 plutipConfig :: PlutipConfig
 plutipConfig =
@@ -258,10 +279,7 @@ assertLovelaceChangeAtAddr addrName addr getExpected comp =
         expected <- getExpected res
         assertContract
           ( "Unexpected lovelace change at addr " <> addrName
-              <> "\n expected=\t"
-              <> show expected
-              <> "\n actual=\t"
-              <> show actual
+              <> mkExpectedVsActual expected actual
           )
           $ comp actual expected
         pure res
@@ -380,3 +398,115 @@ walletEnterpriseAddress walletName wallet = withKeyWallet wallet do
   pkh <- liftedM ("Cannot get " <> walletName <> " pkh") ownPaymentPubKeyHash
   liftContractM ("Could not get " <> walletName <> " payment address") $
     payPubKeyHashEnterpriseAddress networkId pkh
+
+assertOutputHasDatum
+  :: forall (a :: Type) (r :: Row Type)
+   . FromData a
+  => Show a
+  => String
+  -> a
+  -> (a -> a -> Boolean)
+  -> TransactionOutput
+  -> Contract r Unit
+assertOutputHasDatum outputName expectedDatum comp (TransactionOutput output) =
+  do
+    datumHash <- liftContractM (outputName <> " utxo does not have datum hash")
+      output.dataHash
+    rawMpDatum <- liftedM ("Could not get " <> outputName <> " utxo's datum") $
+      getDatumByHash datumHash
+    actualDatum <-
+      liftContractM ("Could not parse " <> outputName <> " utxo's datum")
+        $ fromData
+        $ unwrap rawMpDatum
+    assertContract
+      ( "Unexpected " <> outputName <> " datum value: "
+          <> mkExpectedVsActual expectedDatum actualDatum
+      )
+      (comp expectedDatum actualDatum)
+
+checkOutputHasDatum
+  :: forall (a :: Type) (r :: Row Type)
+   . FromData a
+  => Show a
+  => String
+  -> a
+  -> (a -> a -> Boolean)
+  -> TransactionOutput
+  -> Contract r Boolean
+checkOutputHasDatum outputName expectedDatum comp output =
+  (assertOutputHasDatum outputName expectedDatum comp output *> pure true)
+    `catchError` (const $ pure false)
+
+assertTxHasMetadata
+  :: forall (a :: Type) (r :: Row Type)
+   . MetadataType a
+  => FromMetadata a
+  => Eq a
+  => Show a
+  => String
+  -> TransactionHash
+  -> a
+  -> Contract r Unit
+assertTxHasMetadata metadataName txHash expectedMetadata = do
+  Transaction { auxiliaryData } <-
+    liftedM ("Could not get " <> metadataName <> " tx") $
+      getTxByHash txHash
+  generalMetadata <-
+    liftContractM ("Transaction did not hold metadata")
+      $ auxiliaryData
+      >>= case _ of AuxiliaryData a -> unwrap <$> a.metadata
+  rawMetadata <-
+    liftContractM ("Transaction did not hold " <> metadataName <> " metadata") $
+      Map.lookup
+        (metadataLabel (Proxy :: Proxy a))
+        generalMetadata
+  metadata <-
+    liftContractM ("Could not parse " <> metadataName <> " metadata") $
+      fromMetadata rawMetadata
+  assertContract
+    ( "Unexpected " <> metadataName <> " metadata value: "
+        <> mkExpectedVsActual expectedMetadata metadata
+    )
+    (metadata == expectedMetadata)
+
+checkUtxoWithDatum
+  :: forall (a :: Type) (r :: Row Type)
+   . FromData a
+  => Eq a
+  => Show a
+  => String
+  -> a
+  -> Address
+  -> Contract r Boolean
+checkUtxoWithDatum utxoName datum addr =
+  isJust <$> findUtxoWithDatum utxoName datum addr
+
+findUtxoWithDatum
+  :: forall (a :: Type) (r :: Row Type)
+   . FromData a
+  => Eq a
+  => Show a
+  => String
+  -> a
+  -> Address
+  -> Contract r (Maybe TransactionOutput)
+findUtxoWithDatum utxoName datum addr = do
+  utxos <- liftedM "Could not get utxos" $ map unwrap <$> utxosAt addr
+  findM (checkOutputHasDatum utxoName datum (==)) utxos
+
+findM
+  :: forall (a :: Type) (f :: Type -> Type) (m :: Type -> Type)
+   . Foldable f
+  => Monad m
+  => (a -> m Boolean)
+  -> f a
+  -> m (Maybe a)
+findM pred = foldM h Nothing
+  where
+  h (Just x) _ = pure $ Just x
+  h Nothing x = pred x >>= pure <<< if _ then Just x else Nothing
+
+mkExpectedVsActual
+  :: forall (a :: Type) (b :: Type). Show a => Show b => a -> b -> String
+mkExpectedVsActual expected actual =
+  "\nExpected:\n" <> show expected <> "\nbut got:\n" <> show actual

@@ -2,24 +2,22 @@ module Test.Contract.Minting (suite) where
 
 import Contract.Prelude
 
-import Contract.Address
-  ( getNetworkId
-  , getWalletAddress
-  , validatorHashEnterpriseAddress
-  )
-import Contract.Monad (liftContractM, liftedM)
-import Contract.PlutusData (fromData, getDatumByHash)
+import Contract.Address (getWalletAddress, scriptHashAddress)
+import Contract.Chain (currentSlot)
+import Contract.Monad (liftContractE, liftedM)
 import Contract.Test.Plutip (runPlutipContract, withKeyWallet, withStakeKey)
-import Contract.Transaction (TransactionOutput(..))
 import Data.BigInt as BigInt
-import Mote (test)
+import Mote (only, test)
+import Seabug.Contract.Util (getSeabugMetadata)
 import Seabug.MarketPlace (marketplaceValidatorAddr)
-import Seabug.Types (MarketplaceDatum(..))
+import Seabug.Types (LockDatum(..), MarketplaceDatum(..))
 import Test.Contract.Util
   ( assertContract
+  , assertTxHasMetadata
   , callMintCnft
   , callMintSgNft
   , checkNftAtAddress
+  , assertOutputHasDatum
   , findUtxoWithNft
   , mintParams1
   , plutipConfig
@@ -29,7 +27,7 @@ import TestM (TestPlanM)
 
 suite :: TestPlanM Unit
 suite =
-  test "Minting" do
+  only $ test "Minting" do
     let
       distribution =
         ( withStakeKey privateStakeKey1
@@ -44,29 +42,40 @@ suite =
         assertContract "Could not find cnft at user address" =<<
           checkNftAtAddress cnft aliceAddr
 
-        sgNft /\ nftData <- callMintSgNft cnft mintParams1
+        expectedEntered <- currentSlot
+        { sgNft, nftData, txHash } <- callMintSgNft cnft mintParams1
 
         scriptAddr <- marketplaceValidatorAddr
-        TransactionOutput sgNftUtxo <-
+        sgNftUtxo <-
           liftedM "Could not find sgNft at marketplace address" $
             findUtxoWithNft sgNft scriptAddr
 
-        lockScriptAddr <- liftedM "Could not get locking script addr"
-          $ validatorHashEnterpriseAddress
-          <$> getNetworkId
-          <*> pure (unwrap nftData # _.nftCollection # unwrap # _.lockingScript)
-        assertContract "Could not find cnft at locking address" =<<
-          checkNftAtAddress cnft lockScriptAddr
+        let
+          nftColl = unwrap nftData # _.nftCollection # unwrap
+          lockScriptAddr = scriptHashAddress nftColl.lockingScript
+        cnftUtxo <-
+          liftedM "Could not find cnft at locking address" $
+            findUtxoWithNft cnft lockScriptAddr
 
-        -- TODO: Don't test the datums directly, test it via
-        -- integration with the other contracts
-        sgNftDatumHash <- liftContractM "sgNft utxo does not have datum hash"
-          sgNftUtxo.dataHash
-        rawMpDatum <- liftedM "Could not get sgNft utxo's datum" $
-          getDatumByHash sgNftDatumHash
-        MarketplaceDatum { getMarketplaceDatum: mpDatum } <-
-          liftContractM "Could not parse sgNft utxo's datum"
-            $ fromData
-            $ unwrap rawMpDatum
-        assertContract "Marketplace datum did not hold sgNft's info"
-          (mpDatum == sgNft)
+        assertOutputHasDatum "cnft"
+          ( LockDatum
+              { sgNft: fst sgNft
+              , entered: expectedEntered
+              , underlyingTn: snd cnft
+              }
+          )
+          ( \(LockDatum exp) (LockDatum act) -> exp.sgNft == act.sgNft
+              && exp.underlyingTn
+              == act.underlyingTn
+          )
+          cnftUtxo
+        assertOutputHasDatum "sgNft"
+          (MarketplaceDatum { getMarketplaceDatum: sgNft })
+          (==)
+          sgNftUtxo
+
+        expectedSeabugMetadata <- liftContractE $
+          getSeabugMetadata nftData (fst sgNft)
+        assertTxHasMetadata "sgNft" txHash expectedSeabugMetadata
+
+        pure unit

@@ -11,8 +11,9 @@ import Contract.Address
   , ownStakePubKeyHash
   , payPubKeyHashBaseAddress
   )
+import Contract.AuxiliaryData (setTxMetadata)
 import Contract.Chain (currentSlot, currentTime)
-import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
+import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
 import Contract.PlutusData (toData)
 import Contract.ScriptLookups as Lookups
 import Contract.Scripts (validatorHash)
@@ -26,7 +27,7 @@ import Contract.Value
   , scriptCurrencySymbol
   , singleton
   )
-import Seabug.Contract.Util (setSeabugMetadata)
+import Seabug.Contract.Util (getSeabugMetadata)
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy as MintingPolicy
@@ -107,7 +108,8 @@ mintWithCollection'
       ]
   unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
   let nftData = NftData { nftId: nft, nftCollection: collection }
-  unbalancedTxWithMetadata <- setSeabugMetadata nftData curr unbalancedTx
+  metadata <- liftContractE $ getSeabugMetadata nftData curr
+  unbalancedTxWithMetadata <- setTxMetadata unbalancedTx metadata
   signedTx <- liftedE $ balanceAndSignTxE unbalancedTxWithMetadata
   transactionHash <- submit signedTx
   log $ "Mint transaction successfully submitted with hash: "
