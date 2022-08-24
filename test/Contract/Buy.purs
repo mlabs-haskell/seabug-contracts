@@ -3,7 +3,7 @@ module Test.Contract.Buy (suite) where
 import Contract.Prelude
 
 import Contract.Address (Address, getWalletAddress)
-import Contract.Monad (Contract, liftedM)
+import Contract.Monad (Contract, liftContractE, liftedM)
 import Contract.Numeric.Natural as Nat
 import Contract.PlutusData (Datum(..), toData)
 import Contract.Test.Plutip (runPlutipContract, withKeyWallet, withStakeKey)
@@ -27,17 +27,19 @@ import Seabug.Contract.Buy (marketplaceBuy')
 import Seabug.Contract.Util
   ( ReturnBehaviour(..)
   , SeabugTxData
+  , getSeabugMetadata
   , minAdaOnlyUTxOValue
   , modify
   )
 import Seabug.MarketPlace (marketplaceValidatorAddr)
-import Seabug.Types (MintParams(..))
+import Seabug.Types (MintParams(..), NftData(..))
 import Test.Contract.Util
   ( class WrappingAssertion
   , ContractWrapAssertion
   , assertContract
   , assertGainAtAddr'
   , assertLossAtAddr
+  , assertTxHasMetadata
   , callMintCnft
   , callMintSgNft
   , checkNftAtAddress
@@ -74,12 +76,14 @@ type BuyTestData' (r :: Row Type) =
   , mintParams :: MintParams -- The params used to mint the bought nft
   , sgNft :: CurrencySymbol /\ TokenName -- The nft being bought
   , nftToBuyer :: Boolean -- Whether the nft is being sent directly to the buyer
+  , preBuyNft :: NftData
   | r
   }
 
 type PostBuyTestData = BuyTestData'
   ( txData :: SeabugTxData -- The data of the buy transaction
   , txHash :: TransactionHash -- The hash of the buy transaction
+  , postBuyNft :: NftData
   )
 
 type ExpectedShares =
@@ -251,9 +255,13 @@ mkBuyTest
     $ test conf.testName
     $ (if conf.shouldError then expectError else identity)
     $ runBuyTest mintParams retBehaviour authorIsSeller
-        \b ->
-          -- TODO: check tx metadata
-          mkUtxoAssertions conf b /\ assertions
+        \b -> mkUtxoAssertions conf b /\ assertions /\ buyTxMetadataAssert
+
+buyTxMetadataAssert :: PostBuyTestData -> Contract () Unit
+buyTxMetadataAssert { txHash, txData: { newAsset }, postBuyNft } = do
+  expectedSeabugMetadata <- liftContractE $
+    getSeabugMetadata postBuyNft (fst newAsset)
+  assertTxHasMetadata "Buy" txHash expectedSeabugMetadata
 
 nftToMarketPlaceAssert :: PostBuyTestData -> Array (Contract () Unit)
 nftToMarketPlaceAssert o@{ mpScriptAddr } =
@@ -410,8 +418,13 @@ runBuyTest mintParams retBehaviour authorIsSeller getAssertions = do
           , nftToBuyer: case retBehaviour of
               ToCaller -> true
               _ -> false
+          , preBuyNft: nftData
           }
       void $ withAssertions (getAssertions buyTestData) do
         txHash /\ txData <- marketplaceBuy' retBehaviour nftData
         awaitTxConfirmed txHash
-        pure $ merge buyTestData { txData, txHash }
+        pure $ merge buyTestData
+          { txData
+          , txHash
+          , postBuyNft: modify (_ { nftId = txData.newNft }) nftData
+          }
