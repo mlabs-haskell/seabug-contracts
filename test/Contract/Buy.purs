@@ -32,7 +32,7 @@ import Seabug.Contract.Util
   , modify
   )
 import Seabug.MarketPlace (marketplaceValidatorAddr)
-import Seabug.Types (MintParams(..), NftData(..))
+import Seabug.Types (MintParams(..), NftData)
 import Test.Contract.Util
   ( class WrappingAssertion
   , ContractWrapAssertion
@@ -76,14 +76,14 @@ type BuyTestData' (r :: Row Type) =
   , mintParams :: MintParams -- The params used to mint the bought nft
   , sgNft :: CurrencySymbol /\ TokenName -- The nft being bought
   , nftToBuyer :: Boolean -- Whether the nft is being sent directly to the buyer
-  , preBuyNft :: NftData
+  , preBuyNft :: NftData -- The data of the nft being bought
   | r
   }
 
 type PostBuyTestData = BuyTestData'
   ( txData :: SeabugTxData -- The data of the buy transaction
   , txHash :: TransactionHash -- The hash of the buy transaction
-  , postBuyNft :: NftData
+  , postBuyNft :: NftData -- The data of the nft after it was bought
   )
 
 type ExpectedShares =
@@ -257,33 +257,42 @@ mkBuyTest
     $ runBuyTest mintParams retBehaviour authorIsSeller
         \b -> mkUtxoAssertions conf b /\ assertions /\ buyTxMetadataAssert
 
+-- | Assert that the buy tx metadata is correct
 buyTxMetadataAssert :: PostBuyTestData -> Contract () Unit
 buyTxMetadataAssert { txHash, txData: { newAsset }, postBuyNft } = do
   expectedSeabugMetadata <- liftContractE $
     getSeabugMetadata postBuyNft (fst newAsset)
   assertTxHasMetadata "Buy" txHash expectedSeabugMetadata
 
+-- | Invariants for when the nft is sent to the marketplace after a
+-- | buy
 nftToMarketPlaceAssert :: PostBuyTestData -> Array (Contract () Unit)
 nftToMarketPlaceAssert o@{ mpScriptAddr } =
   [ assertAddrHasNewAsset mpScriptAddr o
   , assertAddrLacksOldAsset mpScriptAddr o
   ]
 
+-- | Invariants for when the nft is sent to the buyer after a buy
 nftToBuyerAssert :: PostBuyTestData -> Array (Contract () Unit)
 nftToBuyerAssert o@{ buyerAddr, mpScriptAddr } =
   [ assertAddrHasNewAsset buyerAddr o, assertAddrLacksOldAsset mpScriptAddr o ]
 
+-- | Assert that the address holds the post-buy updated nft
 assertAddrHasNewAsset :: Address -> PostBuyTestData -> Contract () Unit
 assertAddrHasNewAsset addr { txData } =
   assertContract "Address did not contain new sgNft"
     =<< checkNftAtAddress txData.newAsset addr
 
+-- | Assert that the address does not hold the pre-buy nft
 assertAddrLacksOldAsset :: Address -> PostBuyTestData -> Contract () Unit
 assertAddrLacksOldAsset addr { txData } =
   assertContract "Address contained old sgNft"
     =<< not
     <$> checkNftAtAddress txData.oldAsset addr
 
+-- | Build assertions for the invariants surrounding the utxos of the
+-- | buy transaction, including: correct distribution of
+-- | royalties/shares, and correct payment utxos with datums
 mkUtxoAssertions
   :: forall f
    . WrappingAssertion f () PostBuyTestData
@@ -315,6 +324,11 @@ mkUtxoAssertions
         , assertSellerPayment
         ]
 
+-- | Makes a check for the invariants of the buyer's and the
+-- | marketplace's utxos surrounding a buy. This is separated into its
+-- | own function to handle the special case of the buyer not paying
+-- | the full price, described here:
+-- | https://github.com/mlabs-haskell/seabug-contracts/pull/41#issue-1322730466
 buyerMarketplaceUtxoAssert
   :: ExpectedShares -> BuyTestData -> ContractWrapAssertion () PostBuyTestData
 buyerMarketplaceUtxoAssert
@@ -351,6 +365,8 @@ buyerMarketplaceUtxoAssert
       [ assertPaymentUtxo "Marketplace" mpScriptAddr mpGain
       ]
 
+-- | Assert that the given address has a utxo with the given lovelace
+-- | amount and the correct payment datum.
 assertPaymentUtxo
   :: String -> Address -> BigInt -> PostBuyTestData -> Contract () Unit
 assertPaymentUtxo name addr payment { txData: { oldAsset } }
@@ -362,6 +378,10 @@ assertPaymentUtxo name addr payment { txData: { oldAsset } }
           checkOutputHasDatum name (Datum $ toData oldAsset) (==) o <#>
             (_ && valueToLovelace utxo.amount == payment)
 
+-- | With three actors: Author, Seller, and Buyer, first have Author
+-- | mint a token, second optionally have Seller buy that token, and
+-- | third have Buyer buy the token. The third step is wrapped in the
+-- | given assertions.
 runBuyTest
   :: forall (f :: Type)
    . WrappingAssertion f () PostBuyTestData
