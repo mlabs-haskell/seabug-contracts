@@ -20,11 +20,7 @@ import Contract.PlutusData
   , toData
   , unitRedeemer
   )
-import Contract.ScriptLookups
-  ( ScriptLookups
-  , UnattachedUnbalancedTx
-  , mkUnbalancedTx
-  )
+import Contract.ScriptLookups (ScriptLookups, mkUnbalancedTx)
 import Contract.ScriptLookups
   ( ScriptLookups
   , mintingPolicy

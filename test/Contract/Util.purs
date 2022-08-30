@@ -167,7 +167,9 @@ plutipConfig :: PlutipConfig
 plutipConfig =
   { host: "127.0.0.1"
   , port: UInt.fromInt 8082
-  , logLevel: Error
+  , logLevel: Debug
+  , suppressLogs: true
+  , customLogger: Nothing
   , ogmiosConfig:
       { port: UInt.fromInt 1338
       , host: "127.0.0.1"
@@ -181,11 +183,12 @@ plutipConfig =
       , path: Nothing
       }
   , ctlServerConfig:
-      { port: UInt.fromInt 8083
-      , host: "127.0.0.1"
-      , secure: false
-      , path: Nothing
-      }
+      Just
+        { port: UInt.fromInt 8083
+        , host: "127.0.0.1"
+        , secure: false
+        , path: Nothing
+        }
   , postgresConfig:
       { host: "127.0.0.1"
       , port: UInt.fromInt 5433

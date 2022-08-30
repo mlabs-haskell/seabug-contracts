@@ -312,6 +312,7 @@ let additions =
             , "js-date"
             , "lattice"
             , "lists"
+            , "math"
             , "maybe"
             , "medea"
             , "media-types"
@@ -326,9 +327,9 @@ let additions =
             , "node-process"
             , "node-streams"
             , "nonempty"
-            , "optparse"
             , "now"
             , "numbers"
+            , "optparse"
             , "ordered-collections"
             , "orders"
             , "parallel"
@@ -344,6 +345,7 @@ let additions =
             , "rationals"
             , "record"
             , "refs"
+            , "safe-coerce"
             , "spec"
             , "spec-quickcheck"
             , "strings"
@@ -363,7 +365,7 @@ let additions =
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
           -- should be same rev as in flake.nix
-        , version = "058eeed77b472231e34e8c994be071f4196a0b2f"
+        , version = "09540ea3915be20e5095b3b6f2418ddd712eb58e"
         }
       }
 in upstream // additions
