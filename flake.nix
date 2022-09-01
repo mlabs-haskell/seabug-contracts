@@ -12,8 +12,8 @@
       repo = "cardano-transaction-lib";
       # should be same rev as in packages.dhall
       # To update, do `spago2nix generate`
-      # `calum/fix-slot-length-type` branch
-      rev = "058eeed77b472231e34e8c994be071f4196a0b2f";
+      # `develop` branch
+      rev = "09540ea3915be20e5095b3b6f2418ddd712eb58e";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };
@@ -25,11 +25,9 @@
       nixpkgsFor = system: import nixpkgs {
         inherit system;
         overlays = [
-          cardano-transaction-lib.overlay
-          (_: _: {
-            ctl-server =
-                cardano-transaction-lib.packages.${system}."ctl-server:exe:ctl-server";
-          })
+          cardano-transaction-lib.overlays.purescript
+          cardano-transaction-lib.overlays.ctl-server
+          cardano-transaction-lib.overlays.runtime
         ];
       };
       psProjectFor = system:
@@ -79,6 +77,7 @@
           seabug-contracts-plutip-test = project.runPlutipTest {
             name = "seabug-contracts-plutip-test";
             testMain = "Test.Plutip";
+            withCtlServer = true;
             env = {};
           };
           formatting-check = pkgs.runCommand "formatting-check"
@@ -100,7 +99,7 @@
         packages = {inherit (self.packages) x86_64-linux;};
         devShells = {inherit (self.devShell) x86_64-linux;};
       };
-      
+
       check = perSystem (system:
         (nixpkgsFor system).runCommand "combined-test"
           {

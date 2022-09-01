@@ -7,7 +7,7 @@ import Contract.Chain (currentSlot)
 import Contract.Monad (liftContractE, liftedM)
 import Contract.Test.Plutip (runPlutipContract, withKeyWallet, withStakeKey)
 import Data.BigInt as BigInt
-import Mote (only, test)
+import Mote (test)
 import Seabug.Contract.Util (getSeabugMetadata)
 import Seabug.MarketPlace (marketplaceValidatorAddr)
 import Seabug.Types (LockDatum(..), MarketplaceDatum(..))
@@ -27,7 +27,7 @@ import TestM (TestPlanM)
 
 suite :: TestPlanM Unit
 suite =
-  only $ test "Minting" do
+  test "Minting" do
     let
       distribution =
         ( withStakeKey privateStakeKey1
