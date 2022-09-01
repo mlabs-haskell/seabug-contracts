@@ -1,6 +1,7 @@
 module Seabug.Contract.Mint
   ( mintWithCollection
   , mintWithCollection'
+  , mintWithCollectionTest
   ) where
 
 import Contract.Prelude
@@ -41,18 +42,20 @@ import Seabug.Types
   , NftId(..)
   )
 
--- | Mint the self-governed NFT for the given collection, and return
--- | sgNft's asset class and nft data.
-mintWithCollection'
+mintWithCollectionTest
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName
   -> MintParams
+  -> ( Constraints.TxConstraints Void Void
+       -> Contract r (Constraints.TxConstraints Void Void)
+     )
   -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
-mintWithCollection'
+mintWithCollectionTest
   (collectionNftCs /\ collectionNftTn)
   ( MintParams
       { price, lockLockup, lockLockupEnd, authorShare, daoShare }
-  ) = do
+  )
+  modConstraints = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
   ownerStake <- liftedM "Cannot get StakePubKeyHash" ownStakePubKeyHash
   networkId <- getNetworkId
@@ -106,7 +109,8 @@ mintWithCollection'
           ) $ singleton collectionNftCs collectionNftTn one
       , Constraints.mustValidateIn $ from now
       ]
-  unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
+  unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups
+    =<< modConstraints constraints
   let nftData = NftData { nftId: nft, nftCollection: collection }
   metadata <- liftContractE $ getSeabugMetadata nftData curr
   unbalancedTxWithMetadata <- setTxMetadata unbalancedTx metadata
@@ -115,6 +119,15 @@ mintWithCollection'
   log $ "Mint transaction successfully submitted with hash: "
     <> show transactionHash
   pure $ transactionHash /\ (curr /\ tn) /\ nftData
+
+-- | Mint the self-governed NFT for the given collection, and return
+-- | sgNft's asset class and nft data.
+mintWithCollection'
+  :: forall (r :: Row Type)
+   . CurrencySymbol /\ TokenName
+  -> MintParams
+  -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
+mintWithCollection' c p = mintWithCollectionTest c p pure
 
 -- | Mint the self-governed NFT for the given collection.
 mintWithCollection

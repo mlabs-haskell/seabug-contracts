@@ -1,4 +1,7 @@
-module Seabug.Contract.CnftMint where
+module Seabug.Contract.CnftMint
+  ( mintCnft
+  , mintCnftTest
+  ) where
 
 import Contract.Prelude
 
@@ -35,7 +38,18 @@ mintCnft
   :: forall (r :: Row Type)
    . MintCnftParams
   -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName))
-mintCnft (MintCnftParams params) = do
+mintCnft = mintCnftTest pure
+
+-- | Cnft mint contract with an option to modify the tx constraints,
+-- | for testing purposes.
+mintCnftTest
+  :: forall (r :: Row Type)
+   . ( Constraints.TxConstraints Void Void
+       -> Contract r (Constraints.TxConstraints Void Void)
+     )
+  -> MintCnftParams
+  -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName))
+mintCnftTest modConstraints (MintCnftParams params) = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
   ownerStake <- liftedM "Cannot get StakePubKeyHash" ownStakePubKeyHash
   networkId <- getNetworkId
@@ -68,7 +82,8 @@ mintCnft (MintCnftParams params) = do
       , Constraints.mustSpendPubKeyOutput oref
       , Constraints.mustPayToPubKeyAddress owner ownerStake value
       ]
-  unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
+  unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups
+    =<< modConstraints constraints
   policyHash <- liftedM "Could not get minting policy hash" $ liftAff $
     mintingPolicyHash policy
   name <- liftContractM "Invalid CIP25 NFT name. The name is probably too long."

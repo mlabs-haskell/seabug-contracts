@@ -220,7 +220,7 @@ addAuthorNotSellerVariants = addVariants \conf ->
 
 suite :: TestPlanM Unit
 suite =
-  only $ group "Buy" do
+  group "Buy" do
     let
       tests =
         [ buyTestConfig5 ]
@@ -410,8 +410,8 @@ runBuyTest mintParams retBehaviour authorIsSeller getAssertions = do
     authorPayAddr <- walletEnterpriseAddress "author" author
     sellerPayAddr <- walletEnterpriseAddress "seller" seller
     { sgNft: initialSgNft, nftData: initialNftData } <- withKeyWallet author do
-      cnft <- callMintCnft
-      callMintSgNft cnft mintParams
+      cnft <- callMintCnft pure
+      callMintSgNft cnft mintParams pure
     sgNft /\ nftData <-
       if authorIsSeller then pure $ initialSgNft /\ initialNftData
       else withKeyWallet seller do

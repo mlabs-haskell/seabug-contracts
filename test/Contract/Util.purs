@@ -63,6 +63,7 @@ import Contract.Transaction
   , awaitTxConfirmed
   , getTxByHash
   )
+import Contract.TxConstraints as Constraints
 import Contract.Utxos (utxosAt)
 import Contract.Value
   ( CurrencySymbol
@@ -84,8 +85,8 @@ import Effect.Exception (throw)
 import Metadata.FromMetadata (class FromMetadata, fromMetadata)
 import Metadata.MetadataType (class MetadataType, metadataLabel)
 import Partial.Unsafe (unsafePartial)
-import Seabug.Contract.CnftMint (mintCnft)
-import Seabug.Contract.Mint (mintWithCollection')
+import Seabug.Contract.CnftMint (mintCnftTest)
+import Seabug.Contract.Mint (mintWithCollectionTest)
 import Seabug.Contract.Util (modify)
 import Seabug.Types (MintCnftParams(..), MintParams, NftData)
 import Type.Proxy (Proxy(..))
@@ -129,10 +130,14 @@ mintParams8 :: MintParams
 mintParams8 = modify (_ { price = Nat.fromInt' 50_000_009 }) mintParams1
 
 callMintCnft
-  ∷ forall (r :: Row Type). Contract r (CurrencySymbol /\ TokenName)
-callMintCnft = do
+  ∷ forall (r :: Row Type)
+   . ( Constraints.TxConstraints Void Void
+       -> Contract r (Constraints.TxConstraints Void Void)
+     )
+  -> Contract r (CurrencySymbol /\ TokenName)
+callMintCnft modConstraints = do
   log "Minting cnft..."
-  txHash /\ cnft <- mintCnft $
+  txHash /\ cnft <- mintCnftTest modConstraints $
     MintCnftParams
       { imageUri:
           "ipfs://k2cwuebwvb6kdiwob6sb2yqnz38r0yv72q1xijbts9ep5lq3nm8rw3i4"
@@ -150,14 +155,18 @@ callMintSgNft
   :: forall (r :: Row Type)
    . Tuple CurrencySymbol TokenName
   -> MintParams
+  -> ( Constraints.TxConstraints Void Void
+       -> Contract r (Constraints.TxConstraints Void Void)
+     )
   -> Contract r
        { sgNft :: (CurrencySymbol /\ TokenName)
        , nftData :: NftData
        , txHash :: TransactionHash
        }
-callMintSgNft cnft mintParams = do
+callMintSgNft cnft mintParams modConstraints = do
   log "Minting sgNft..."
-  txHash /\ sgNft /\ nftData <- mintWithCollection' cnft mintParams
+  txHash /\ sgNft /\ nftData <-
+    mintWithCollectionTest cnft mintParams modConstraints
   log $ "Waiting for confirmation of nft transaction: " <> show txHash
   awaitTxConfirmed txHash
   log $ "Nft transaction confirmed: " <> show txHash
