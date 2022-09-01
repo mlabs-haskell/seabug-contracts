@@ -16,7 +16,6 @@ import Contract.Transaction
   , getTxByHash
   )
 import Contract.Value (CurrencySymbol, TokenName, getLovelace)
-import Data.Array ((:))
 import Data.Array as Array
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
@@ -198,10 +197,7 @@ addVariants
   :: (BuyTestConfig BasicBuyAssertGroup -> BuyTestConfig BasicBuyAssertGroup)
   -> Array (BuyTestConfig BasicBuyAssertGroup)
   -> Array (BuyTestConfig BasicBuyAssertGroup)
-addVariants vary = Array.uncons >>> case _ of
-  Nothing -> []
-  Just { head: conf, tail: confs } ->
-    conf : vary conf : addVariants vary confs
+addVariants vary = Array.foldMap (\x -> [ x, vary x ])
 
 addNftToBuyerVariants
   :: Array (BuyTestConfig BasicBuyAssertGroup)
