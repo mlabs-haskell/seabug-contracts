@@ -4,6 +4,7 @@ module Seabug.CallContract
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
+  , callMarketPlaceSell
   , callMint
   ) where
 
@@ -34,6 +35,7 @@ import Contract.Value
 import Control.Monad.Error.Class (throwError)
 import Control.Promise (Promise)
 import Control.Promise as Promise
+import Data.Bifunctor (lmap)
 import Data.BigInt (BigInt)
 import Data.BigInt as BigInt
 import Data.Log.Level (LogLevel(..))
@@ -50,6 +52,7 @@ import Seabug.Contract.CnftMint (mintCnft)
 import Seabug.Contract.Common (NftResult)
 import Seabug.Contract.MarketPlaceFetchNft (marketPlaceFetchNft)
 import Seabug.Contract.MarketPlaceListNft (marketPlaceListNft)
+import Seabug.Contract.MarketPlaceSell (marketPlaceSell)
 import Seabug.Contract.Mint (mintWithCollection)
 import Seabug.Metadata.Share (unShare)
 import Seabug.Metadata.Types (SeabugMetadata(SeabugMetadata))
@@ -134,6 +137,19 @@ callMarketPlaceListNft cfg = Promise.fromAff do
   listnft <- runContract contractConfig (marketPlaceListNft cfg.projectId)
   pure $ buildNftList contractConfig.networkId <$> listnft
 
+-- | Calls Seabugs marketPlaceSell and takes care of converting data types.
+-- | Returns a JS promise.
+callMarketPlaceSell
+  :: ContractConfiguration -> SellArgs -> Effect (Promise Unit)
+callMarketPlaceSell cfg args = Promise.fromAff do
+  contractConfig <- liftEither $ buildContractConfig cfg
+  sellArgs <- liftEither $ buildSellArgs args
+  runContract contractConfig do
+    txHash <- marketPlaceSell sellArgs
+    log $ "Waiting for confirmation of sell transaction: " <> show txHash
+    awaitTxConfirmed txHash
+    log $ "Sell transaction confirmed: " <> show txHash
+
 -- | Configuation needed to call contracts from JS.
 type ContractConfiguration =
   { serverHost :: String
@@ -200,6 +216,11 @@ type MintArgs =
   , name :: String
   , description :: String
   , price :: BigInt -- Natural
+  }
+
+type SellArgs =
+  { tokenCS :: String
+  , tokenName :: String
   }
 
 buildContractConfig
@@ -381,6 +402,14 @@ buildMintArgs
       , feeVaultKeys: []
       }
   pure (mintCnftParams /\ mintParams)
+
+buildSellArgs :: SellArgs -> Either Error (CurrencySymbol /\ TokenName)
+buildSellArgs { tokenCS, tokenName } = lmap error do
+  csBytes <- note "Failed to convert to bytes" $ hexToByteArray tokenCS
+  cs <- note "Failed to convert to currency symbol" $ mkCurrencySymbol csBytes
+  tnBytes <- note "Failed to convert to bytes" $ hexToByteArray tokenName
+  tn <- note "Failed to convert to token name" $ mkTokenName tnBytes
+  pure (cs /\ tn)
 
 buildTransactionInput :: TransactionInputOut -> Either Error TransactionInput
 buildTransactionInput input = do

@@ -5,6 +5,7 @@ import Contract.Prelude
 import Contract.Monad (launchAff_)
 import Test.Contract.Buy as Buy
 import Test.Contract.Minting as Minting
+import Test.Contract.Sell as Sell
 import Test.Spec.Runner (defaultConfig)
 import Test.Util (interpretWithConfig)
 import TestM (TestPlanM)
@@ -21,3 +22,4 @@ plutipTestPlan :: TestPlanM Unit
 plutipTestPlan = do
   Minting.suite
   Buy.suite
+  Sell.suite

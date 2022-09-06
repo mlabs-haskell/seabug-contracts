@@ -28,7 +28,11 @@ import Contract.Value
   , scriptCurrencySymbol
   , singleton
   )
-import Seabug.Contract.Util (getSeabugMetadata)
+import Seabug.Contract.Util
+  ( ReturnBehaviour(ToMarketPlace)
+  , getSeabugMetadata
+  , payBehaviour
+  )
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy as MintingPolicy
@@ -44,13 +48,15 @@ import Seabug.Types
 
 mintWithCollectionTest
   :: forall (r :: Row Type)
-   . CurrencySymbol /\ TokenName
+   . ReturnBehaviour
+  -> CurrencySymbol /\ TokenName
   -> MintParams
   -> ( Constraints.TxConstraints Void Void
        -> Contract r (Constraints.TxConstraints Void Void)
      )
   -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
 mintWithCollectionTest
+  retBehaviour
   (collectionNftCs /\ collectionNftTn)
   ( MintParams
       { price, lockLockup, lockLockupEnd, authorShare, daoShare }
@@ -95,11 +101,8 @@ mintWithCollectionTest
     constraints = mconcat
       [ Constraints.mustMintValueWithRedeemer (wrap $ toData $ MintToken nft)
           nftValue
-      , Constraints.mustPayToScript marketplaceValidator'.validatorHash
-          ( wrap $ toData $ MarketplaceDatum
-              { getMarketplaceDatum: curr /\ tn }
-          )
-          nftValue
+      , payBehaviour retBehaviour marketplaceValidator'.validatorHash
+          (curr /\ tn)
       , Constraints.mustPayToScript lockingScriptHash
           ( wrap $ toData $ LockDatum
               { sgNft: curr
@@ -127,7 +130,7 @@ mintWithCollection'
    . CurrencySymbol /\ TokenName
   -> MintParams
   -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
-mintWithCollection' c p = mintWithCollectionTest c p pure
+mintWithCollection' c p = mintWithCollectionTest ToMarketPlace c p pure
 
 -- | Mint the self-governed NFT for the given collection.
 mintWithCollection

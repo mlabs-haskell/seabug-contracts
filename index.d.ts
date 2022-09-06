@@ -1,5 +1,7 @@
 export function callMarketPlaceBuy(config: Config, args: BuyNftArgs):
     Promise<void>
+export function callMarketPlaceSell(config: Config, args: SellArgs):
+    Promise<void>
 export function callMarketPlaceListNft(config: Config):
     Promise<Array<NftListing>>
 /**
@@ -44,6 +46,11 @@ export type ContractArgs = {
 
 export type BuyNftArgs = {
 
+}
+
+export type SellArgs = {
+    tokenCS: string,
+    tokenName: string
 }
 
 export type FetchNftArgs = Input
