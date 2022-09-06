@@ -405,10 +405,8 @@ buildMintArgs
 
 buildSellArgs :: SellArgs -> Either Error (CurrencySymbol /\ TokenName)
 buildSellArgs { tokenCS, tokenName } = lmap error do
-  csBytes <- note "Failed to convert to bytes" $ hexToByteArray tokenCS
-  cs <- note "Failed to convert to currency symbol" $ mkCurrencySymbol csBytes
-  tnBytes <- note "Failed to convert to bytes" $ hexToByteArray tokenName
-  tn <- note "Failed to convert to token name" $ mkTokenName tnBytes
+  cs <- note "Failed to convert to currency symbol" $ mkCurrencySymbol =<< hexToByteArray tokenCS
+  tn <- note "Failed to convert to token name" $ mkTokenName =<< hexToByteArray tokenName
   pure (cs /\ tn)
 
 buildTransactionInput :: TransactionInputOut -> Either Error TransactionInput
