@@ -5,8 +5,7 @@ module Seabug.Contract.MarketPlaceListNft
 
 import Contract.Prelude
 
-import Contract.Address (getNetworkId, typedValidatorEnterpriseAddress)
-import Contract.Monad (Contract, liftContractE, liftContractM, liftedM)
+import Contract.Monad (Contract, liftedM)
 import Contract.Numeric.Natural as Natural
 import Contract.PlutusData (fromData, getDatumsByHashes)
 import Contract.Transaction (TransactionOutput(TransactionOutput))
@@ -19,7 +18,7 @@ import Data.Array (catMaybes, mapMaybe)
 import Data.Map as Map
 import Seabug.Contract.Common (NftResult)
 import Seabug.Contract.Util (minAdaOnlyUTxOValue)
-import Seabug.MarketPlace (marketplaceValidator)
+import Seabug.MarketPlace (marketplaceValidatorAddr)
 import Seabug.Metadata (getFullSeabugMetadataWithBackoff)
 import Seabug.Types (MarketplaceDatum(MarketplaceDatum))
 
@@ -31,12 +30,7 @@ marketPlaceListNft
    . String
   -> Contract r (Array NftResult)
 marketPlaceListNft projectId = do
-  marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
-  networkId <- getNetworkId
-  scriptAddr <-
-    liftContractM "marketPlaceListNft: Cannot convert validator hash to address"
-      $ typedValidatorEnterpriseAddress networkId
-      $ wrap marketplaceValidator'
+  scriptAddr <- marketplaceValidatorAddr
   scriptUtxos <- Map.toUnfoldable <<< unwrap <$>
     liftedM "marketPlaceListNft: Cannot get script Utxos"
       (utxosAt scriptAddr)

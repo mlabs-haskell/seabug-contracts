@@ -1,9 +1,13 @@
-module Seabug.Contract.SetPrice where
+module Seabug.Contract.SetPrice
+  ( marketplaceSetPrice
+  , marketplaceSetPrice'
+  ) where
 
 import Contract.Prelude
 
 import Contract.Monad (Contract)
 import Contract.Numeric.Natural (Natural)
+import Contract.Transaction (TransactionHash)
 import Plutus.Types.Transaction (UtxoM)
 import Seabug.Contract.Util
   ( SeabugTxData
@@ -12,10 +16,7 @@ import Seabug.Contract.Util
   , modify
   , seabugTxToMarketTx
   )
-import Seabug.Types
-  ( MintAct(ChangePrice)
-  , NftData
-  )
+import Seabug.Types (MintAct(ChangePrice), NftData)
 
 mkSetPriceTxData
   :: forall (r :: Row Type)
@@ -29,5 +30,13 @@ mkSetPriceTxData newPrice =
 
 marketplaceSetPrice
   :: forall (r :: Row Type). Natural -> NftData -> Contract r Unit
-marketplaceSetPrice =
+marketplaceSetPrice price nft =
+  void $ marketplaceSetPrice' price nft
+
+marketplaceSetPrice'
+  :: forall (r :: Row Type)
+   . Natural
+  -> NftData
+  -> Contract r (TransactionHash /\ SeabugTxData)
+marketplaceSetPrice' =
   seabugTxToMarketTx "marketplaceSetPrice" ToMarketPlace <<< mkSetPriceTxData

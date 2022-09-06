@@ -1,4 +1,8 @@
-module Seabug.Contract.Mint where
+module Seabug.Contract.Mint
+  ( mintWithCollection
+  , mintWithCollection'
+  , mintWithCollectionTest
+  ) where
 
 import Contract.Prelude
 
@@ -8,6 +12,7 @@ import Contract.Address
   , ownStakePubKeyHash
   , payPubKeyHashBaseAddress
   )
+import Contract.AuxiliaryData (setTxMetadata)
 import Contract.Chain (currentSlot, currentTime)
 import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
 import Contract.PlutusData (toData)
@@ -23,7 +28,7 @@ import Contract.Value
   , scriptCurrencySymbol
   , singleton
   )
-import Seabug.Contract.Util (setSeabugMetadata)
+import Seabug.Contract.Util (getSeabugMetadata)
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy as MintingPolicy
@@ -37,26 +42,28 @@ import Seabug.Types
   , NftId(..)
   )
 
--- | Mint the self-governed NFT for the given collection.
-mintWithCollection
+mintWithCollectionTest
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName
   -> MintParams
-  -> Contract r TransactionHash
-mintWithCollection
+  -> ( Constraints.TxConstraints Void Void
+       -> Contract r (Constraints.TxConstraints Void Void)
+     )
+  -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
+mintWithCollectionTest
   (collectionNftCs /\ collectionNftTn)
   ( MintParams
       { price, lockLockup, lockLockupEnd, authorShare, daoShare }
-  ) = do
+  )
+  modConstraints = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
   ownerStake <- liftedM "Cannot get StakePubKeyHash" ownStakePubKeyHash
   networkId <- getNetworkId
   addr <- liftContractM "Cannot get user address" $
     payPubKeyHashBaseAddress networkId owner ownerStake
   utxos <- liftedM "Cannot get user utxos" $ utxosAt addr
-  marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
-  lockingScript <- liftedE $ mkLockScript collectionNftCs lockLockup
-    lockLockupEnd
+  marketplaceValidator' <- unwrap <$> marketplaceValidator
+  lockingScript <- mkLockScript collectionNftCs lockLockup lockLockupEnd
   lockingScriptHash <- liftedM "Could not get locking script hash" $ liftAff $
     validatorHash lockingScript
   let
@@ -79,15 +86,17 @@ mintWithCollection
   now <- currentTime
   let
     nftValue = singleton curr tn one
+
+    lookups :: Lookups.ScriptLookups Void
     lookups = mconcat
       [ Lookups.mintingPolicy policy, Lookups.unspentOutputs (unwrap utxos) ]
 
-    constraints :: Constraints.TxConstraints Unit Unit
+    constraints :: Constraints.TxConstraints Void Void
     constraints = mconcat
       [ Constraints.mustMintValueWithRedeemer (wrap $ toData $ MintToken nft)
           nftValue
       , Constraints.mustPayToScript marketplaceValidator'.validatorHash
-          ( wrap $ toData $ MarketplaceDatum $
+          ( wrap $ toData $ MarketplaceDatum
               { getMarketplaceDatum: curr /\ tn }
           )
           nftValue
@@ -100,13 +109,30 @@ mintWithCollection
           ) $ singleton collectionNftCs collectionNftTn one
       , Constraints.mustValidateIn $ from now
       ]
-  unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups constraints
-  unbalancedTxWithMetadata <- setSeabugMetadata
-    (NftData { nftId: nft, nftCollection: collection })
-    curr
-    unbalancedTx
+  unbalancedTx <- liftedE $ Lookups.mkUnbalancedTx lookups
+    =<< modConstraints constraints
+  let nftData = NftData { nftId: nft, nftCollection: collection }
+  metadata <- liftContractE $ getSeabugMetadata nftData curr
+  unbalancedTxWithMetadata <- setTxMetadata unbalancedTx metadata
   signedTx <- liftedE $ balanceAndSignTxE unbalancedTxWithMetadata
   transactionHash <- submit signedTx
-  log $ "Mint transaction successfully submitted with hash: " <> show
-    transactionHash
-  pure transactionHash
+  log $ "Mint transaction successfully submitted with hash: "
+    <> show transactionHash
+  pure $ transactionHash /\ (curr /\ tn) /\ nftData
+
+-- | Mint the self-governed NFT for the given collection, and return
+-- | sgNft's asset class and nft data.
+mintWithCollection'
+  :: forall (r :: Row Type)
+   . CurrencySymbol /\ TokenName
+  -> MintParams
+  -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
+mintWithCollection' c p = mintWithCollectionTest c p pure
+
+-- | Mint the self-governed NFT for the given collection.
+mintWithCollection
+  :: forall (r :: Row Type)
+   . CurrencySymbol /\ TokenName
+  -> MintParams
+  -> Contract r TransactionHash
+mintWithCollection c p = fst <$> mintWithCollection' c p

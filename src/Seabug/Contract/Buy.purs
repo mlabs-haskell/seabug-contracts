@@ -1,14 +1,16 @@
-module Seabug.Contract.Buy (marketplaceBuy, mkBuyTxData) where
+module Seabug.Contract.Buy
+  ( marketplaceBuy
+  , marketplaceBuy'
+  , mkBuyTxData
+  ) where
 
 import Contract.Prelude
 
 import Contract.Address (ownPaymentPubKeyHash)
 import Contract.Monad (Contract, liftedM)
 import Contract.Numeric.Natural (toBigInt)
-import Contract.PlutusData
-  ( Datum(Datum)
-  , toData
-  )
+import Contract.PlutusData (Datum(Datum), toData)
+import Contract.Transaction (TransactionHash)
 import Contract.TxConstraints
   ( TxConstraints
   , mustPayToScript
@@ -18,18 +20,15 @@ import Contract.Value as Value
 import Data.BigInt (BigInt, fromInt)
 import Plutus.Types.Transaction (UtxoM)
 import Seabug.Contract.Util
-  ( SeabugTxData
-  , ReturnBehaviour(ToCaller)
+  ( ReturnBehaviour(..)
+  , SeabugTxData
   , minAdaOnlyUTxOValue
-  , seabugTxToMarketTx
   , mkChangeNftIdTxData
   , modify
+  , seabugTxToMarketTx
   )
 import Seabug.Metadata.Share (maxShare)
-import Seabug.Types
-  ( MintAct(ChangeOwner)
-  , NftData
-  )
+import Seabug.Types (MintAct(ChangeOwner), NftData)
 
 mkBuyTxData
   :: forall (r :: Row Type)
@@ -60,8 +59,8 @@ mkBuyTxData nftData mScriptUtxos = do
 
     filterLowValue
       :: BigInt
-      -> (Value.Value -> TxConstraints Unit Unit)
-      -> TxConstraints Unit Unit
+      -> (Value.Value -> TxConstraints Void Void)
+      -> TxConstraints Void Void
     filterLowValue v t
       | v < minAdaOnlyUTxOValue = mempty
       | otherwise = t (Value.lovelaceValueOf v)
@@ -73,6 +72,7 @@ mkBuyTxData nftData mScriptUtxos = do
       - shareToSubtract daoShare
     datum = Datum $ toData txData.oldAsset
 
+    constraints :: TxConstraints Void Void
     constraints =
       filterLowValue
         daoShare
@@ -88,4 +88,12 @@ mkBuyTxData nftData mScriptUtxos = do
   pure $ txData { constraints = constraints }
 
 marketplaceBuy :: forall (r :: Row Type). NftData -> Contract r Unit
-marketplaceBuy = seabugTxToMarketTx "marketplaceBuy" ToCaller mkBuyTxData
+marketplaceBuy = void <<< marketplaceBuy' ToCaller
+
+marketplaceBuy'
+  :: forall (r :: Row Type)
+   . ReturnBehaviour
+  -> NftData
+  -> Contract r (TransactionHash /\ SeabugTxData)
+marketplaceBuy' retBehaviour = seabugTxToMarketTx "marketplaceBuy" retBehaviour
+  mkBuyTxData

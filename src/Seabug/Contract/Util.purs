@@ -5,7 +5,7 @@ module Seabug.Contract.Util
   , mkChangeNftIdTxData
   , modify
   , seabugTxToMarketTx
-  , setSeabugMetadata
+  , getSeabugMetadata
   ) where
 
 import Contract.Prelude
@@ -20,20 +20,18 @@ import Contract.PlutusData
   , toData
   , unitRedeemer
   )
+import Contract.ScriptLookups (ScriptLookups, mkUnbalancedTx)
 import Contract.ScriptLookups
   ( ScriptLookups
-  , UnattachedUnbalancedTx
-  , mkUnbalancedTx
-  )
-import Contract.ScriptLookups
-  ( mintingPolicy
+  , mintingPolicy
   , typedValidatorLookups
   , unspentOutputs
   , validator
   ) as ScriptLookups
 import Contract.Scripts (typedValidatorEnterpriseAddress)
 import Contract.Transaction
-  ( TransactionOutput(TransactionOutput)
+  ( TransactionHash
+  , TransactionOutput(TransactionOutput)
   , balanceAndSignTxE
   , submit
   )
@@ -63,12 +61,11 @@ import Seabug.Types
   , NftData(..)
   , NftId
   )
-import Serialization.Types (PlutusData)
 import Types.Transaction (TransactionInput)
 
 type SeabugTxData =
-  { constraints :: TxConstraints Unit Unit
-  , lookups :: ScriptLookups PlutusData
+  { constraints :: TxConstraints Void Void
+  , lookups :: ScriptLookups Void
   , oldAsset :: Value.CurrencySymbol /\ Value.TokenName
   , newAsset :: Value.CurrencySymbol /\ Value.TokenName
   , inputUtxo :: TransactionInput
@@ -89,9 +86,9 @@ seabugTxToMarketTx
   -> ReturnBehaviour
   -> (NftData -> Maybe UtxoM -> Contract r SeabugTxData)
   -> NftData
-  -> Contract r Unit
+  -> Contract r (TransactionHash /\ SeabugTxData)
 seabugTxToMarketTx name retBehaviour mkTxData nftData = do
-  marketplaceValidator' <- unwrap <$> liftContractE marketplaceValidator
+  marketplaceValidator' <- unwrap <$> marketplaceValidator
   networkId <- getNetworkId
   scriptAddr <-
     liftContractM (name <> ": Cannot convert validator hash to address")
@@ -103,12 +100,16 @@ seabugTxToMarketTx name retBehaviour mkTxData nftData = do
   txData <- mkTxData nftData (Just scriptUtxos)
   let
     valHash = marketplaceValidator'.validatorHash
+
+    lookups :: ScriptLookups.ScriptLookups Void
     lookups = txData.lookups <> mconcat
       [ ScriptLookups.typedValidatorLookups $ wrap marketplaceValidator'
       , ScriptLookups.validator marketplaceValidator'.validator
       ]
     newNftValue =
       Value.singleton (fst txData.newAsset) (snd txData.newAsset) one
+
+    constraints :: TxConstraints Void Void
     constraints = txData.constraints
       <> mustSpendScriptOutput txData.inputUtxo unitRedeemer
       <>
@@ -123,10 +124,10 @@ seabugTxToMarketTx name retBehaviour mkTxData nftData = do
           ToCaller -> mempty -- Balancing will return the token to the caller
 
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookups constraints
-  txWithMetadata <-
-    setSeabugMetadata (modify (_ { nftId = txData.newNft }) nftData)
-      (fst txData.newAsset)
-      txDatumsRedeemerTxIns
+  metadata <- liftContractE $ getSeabugMetadata
+    (modify (_ { nftId = txData.newNft }) nftData)
+    (fst txData.newAsset)
+  txWithMetadata <- setTxMetadata txDatumsRedeemerTxIns metadata
 
   signedTx <- liftedE
     ( lmap
@@ -143,6 +144,7 @@ seabugTxToMarketTx name retBehaviour mkTxData nftData = do
   log $ name <> ": Transaction successfully submitted with hash: "
     <> show transactionHash
   log $ name <> ": Buy successful: " <> show txData.newAsset
+  pure $ transactionHash /\ txData
 
 -- | Make tx data to change an nft's `NftId` by "reminting"
 -- | it. Provide a utxo map for the nft's utxo to be found in; if a
@@ -210,22 +212,21 @@ minAdaOnlyUTxOValue :: BigInt
 minAdaOnlyUTxOValue = BigInt.fromInt 2_000_000
 
 -- | Set metadata on the transaction for the given NFT
-setSeabugMetadata
+getSeabugMetadata
   :: forall (r :: Row Type)
    . NftData
   -> CurrencySymbol -- | The currency symbol of the self-governed nft
-  -> UnattachedUnbalancedTx
-  -> Contract r UnattachedUnbalancedTx
-setSeabugMetadata (NftData nftData) sgNftCurr tx = do
+  -> Either String SeabugMetadata
+getSeabugMetadata (NftData nftData) sgNftCurr = do
   let
     nftCollection = unwrap nftData.nftCollection
     nftId = unwrap nftData.nftId
-    natToShare nat = liftContractM "Invalid share"
+    natToShare nat = note "Invalid share"
       $ mkShare
       =<< BigInt.toInt (toBigInt nat)
   authorShareValidated <- natToShare nftCollection.authorShare
   marketplaceShareValidated <- natToShare nftCollection.daoShare
-  setTxMetadata tx $ SeabugMetadata
+  pure $ SeabugMetadata
     { policyId: sgNftCurr
     , mintPolicy: "V1"
     , collectionNftCS: nftCollection.collectionNftCs

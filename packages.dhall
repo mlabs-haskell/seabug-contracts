@@ -149,7 +149,7 @@ let additions =
           , "untagged-union"
           ]
         , repo = "https://github.com/mlabs-haskell/purescript-aeson.git"
-        , version = "286862a975f4bafbef15540c365bbbb0480e0bf7"
+        , version = "8e9d42980e824450c18c397295573160d1ce8424"
         }
       , aeson-helpers =
         { dependencies =
@@ -312,6 +312,7 @@ let additions =
             , "js-date"
             , "lattice"
             , "lists"
+            , "math"
             , "maybe"
             , "medea"
             , "media-types"
@@ -326,9 +327,9 @@ let additions =
             , "node-process"
             , "node-streams"
             , "nonempty"
-            , "optparse"
             , "now"
             , "numbers"
+            , "optparse"
             , "ordered-collections"
             , "orders"
             , "parallel"
@@ -344,9 +345,11 @@ let additions =
             , "rationals"
             , "record"
             , "refs"
+            , "safe-coerce"
             , "spec"
             , "spec-quickcheck"
             , "strings"
+            , "stringutils"
             , "tailrec"
             , "text-encoding"
             , "these"
@@ -362,7 +365,7 @@ let additions =
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
           -- should be same rev as in flake.nix
-        , version = "6c018d43ddfef771bfd586e885ecb0cc7ebd8421"
+        , version = "09540ea3915be20e5095b3b6f2418ddd712eb58e"
         }
       }
 in upstream // additions

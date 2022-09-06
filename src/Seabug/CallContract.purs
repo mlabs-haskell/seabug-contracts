@@ -230,13 +230,15 @@ buildContractConfig cfg = do
         , path: Nothing
         }
     , ctlServerConfig:
-        { port: serverPort
-        , host: cfg.serverHost
-        , secure: cfg.serverSecureConn
-        , path: Nothing
-        }
+        Just
+          { port: serverPort
+          , host: cfg.serverHost
+          , secure: cfg.serverSecureConn
+          , path: Nothing
+          }
     , networkId: networkId
     , logLevel: logLevel
+    , suppressLogs: true
     , extraConfig: {}
     , walletSpec: Nothing
     , customLogger: Nothing

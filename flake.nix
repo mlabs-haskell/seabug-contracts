@@ -13,7 +13,7 @@
       # should be same rev as in packages.dhall
       # To update, do `spago2nix generate`
       # `develop` branch
-      rev = "6c018d43ddfef771bfd586e885ecb0cc7ebd8421";
+      rev = "09540ea3915be20e5095b3b6f2418ddd712eb58e";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };
@@ -24,7 +24,11 @@
       perSystem = nixpkgs.lib.genAttrs defaultSystems;
       nixpkgsFor = system: import nixpkgs {
         inherit system;
-        overlays = [ cardano-transaction-lib.overlay ];
+        overlays = [
+          cardano-transaction-lib.overlays.purescript
+          cardano-transaction-lib.overlays.ctl-server
+          cardano-transaction-lib.overlays.runtime
+        ];
       };
       psProjectFor = system:
         let
@@ -35,9 +39,14 @@
           inherit pkgs src;
           projectName = "seabug-contracts";
           shell = {
-            packages = [
-              pkgs.easy-ps.purs-tidy
-              pkgs.fd
+            packages = with pkgs; [
+              easy-ps.purs-tidy
+              fd
+              plutip-server
+              ctl-server
+              ogmios
+              ogmios-datum-cache
+              postgresql
             ];
           };
         };
@@ -62,8 +71,14 @@
           project = psProjectFor system;
         in
         {
-          seabug-contracts = project.runPursTest {
+          seabug-contracts-unit-test = project.runPursTest {
             sources = [ "exe" "test" "src" ];
+          };
+          seabug-contracts-plutip-test = project.runPlutipTest {
+            name = "seabug-contracts-plutip-test";
+            testMain = "Test.Plutip";
+            withCtlServer = true;
+            env = {};
           };
           formatting-check = pkgs.runCommand "formatting-check"
             {
@@ -84,7 +99,7 @@
         packages = {inherit (self.packages) x86_64-linux;};
         devShells = {inherit (self.devShell) x86_64-linux;};
       };
-      
+
       check = perSystem (system:
         (nixpkgsFor system).runCommand "combined-test"
           {
