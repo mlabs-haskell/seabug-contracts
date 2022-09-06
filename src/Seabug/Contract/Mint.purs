@@ -38,7 +38,6 @@ import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy as MintingPolicy
 import Seabug.Types
   ( LockDatum(..)
-  , MarketplaceDatum(..)
   , MintAct(..)
   , MintParams(..)
   , NftCollection(..)
