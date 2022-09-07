@@ -4,12 +4,7 @@ module Seabug.Contract.MarketPlaceSell
 
 import Contract.Prelude
 
-import Contract.Address
-  ( getNetworkId
-  , ownPaymentPubKeyHash
-  , ownStakePubKeyHash
-  , payPubKeyHashBaseAddress
-  )
+import Contract.Address (getWalletAddress)
 import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
 import Contract.PlutusData (toData)
 import Contract.ScriptLookups as Lookups
@@ -34,11 +29,7 @@ marketPlaceSell
    . CurrencySymbol /\ TokenName
   -> Contract r TransactionHash
 marketPlaceSell (curr /\ tn) = do
-  owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
-  ownerStake <- liftedM "Cannot get StakePubKeyHash" ownStakePubKeyHash
-  networkId <- getNetworkId
-  addr <- liftContractM "Cannot get user address" $
-    payPubKeyHashBaseAddress networkId owner ownerStake
+  addr <- liftedM "Cannot get address" getWalletAddress
   utxos <- liftedM "Cannot get user utxos" $ utxosAt addr
   marketplaceValidator' <- unwrap <$> marketplaceValidator
 

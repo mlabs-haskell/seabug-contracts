@@ -7,14 +7,12 @@ module Seabug.Contract.Mint
 import Contract.Prelude
 
 import Contract.Address
-  ( getNetworkId
-  , ownPaymentPubKeyHash
-  , ownStakePubKeyHash
-  , payPubKeyHashBaseAddress
+  ( ownPaymentPubKeyHash
+  , getWalletAddress
   )
 import Contract.AuxiliaryData (setTxMetadata)
 import Contract.Chain (currentSlot, currentTime)
-import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
+import Contract.Monad (Contract, liftContractE, liftedE, liftedM)
 import Contract.PlutusData (toData)
 import Contract.ScriptLookups as Lookups
 import Contract.Scripts (validatorHash)
@@ -62,10 +60,7 @@ mintWithCollectionTest
   )
   modConstraints = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
-  ownerStake <- liftedM "Cannot get StakePubKeyHash" ownStakePubKeyHash
-  networkId <- getNetworkId
-  addr <- liftContractM "Cannot get user address" $
-    payPubKeyHashBaseAddress networkId owner ownerStake
+  addr <- liftedM "Cannot get address" getWalletAddress
   utxos <- liftedM "Cannot get user utxos" $ utxosAt addr
   marketplaceValidator' <- unwrap <$> marketplaceValidator
   lockingScript <- mkLockScript collectionNftCs lockLockup lockLockupEnd

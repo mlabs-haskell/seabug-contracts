@@ -1,12 +1,12 @@
 module Seabug.Contract.Util
-  ( SeabugTxData
-  , ReturnBehaviour(..)
-  , minAdaOnlyUTxOValue
+  ( ReturnBehaviour(..)
+  , SeabugTxData
+  , getSeabugMetadata
+  , minUTxOValue
   , mkChangeNftIdTxData
   , modify
-  , seabugTxToMarketTx
-  , getSeabugMetadata
   , payBehaviour
+  , seabugTxToMarketTx
   ) where
 
 import Contract.Prelude
@@ -92,7 +92,9 @@ payBehaviour ToMarketPlace valHash asset =
     ( Datum $ toData $
         MarketplaceDatum { getMarketplaceDatum: asset }
     )
-    (Value.singleton (fst asset) (snd asset) one)
+    ( Value.singleton (fst asset) (snd asset) one <> Value.lovelaceValueOf
+        minUTxOValue
+    )
 
 -- | Build and submit a transaction involving a given nft, specifying
 -- | if the nft should be sent to the current user or the marketplace.
@@ -213,8 +215,8 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
     , newNft: newNft
     }
 
-minAdaOnlyUTxOValue :: BigInt
-minAdaOnlyUTxOValue = BigInt.fromInt 2_000_000
+minUTxOValue :: BigInt
+minUTxOValue = BigInt.fromInt 2_000_000
 
 -- | Set metadata on the transaction for the given NFT
 getSeabugMetadata
