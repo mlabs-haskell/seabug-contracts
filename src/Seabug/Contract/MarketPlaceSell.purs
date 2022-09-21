@@ -5,7 +5,7 @@ module Seabug.Contract.MarketPlaceSell
 import Contract.Prelude
 
 import Contract.Address (getWalletAddress)
-import Contract.Monad (Contract, liftContractM, liftedE, liftedM)
+import Contract.Monad (Contract, liftedE, liftedM)
 import Contract.PlutusData (toData)
 import Contract.ScriptLookups as Lookups
 import Contract.Transaction (TransactionHash, balanceAndSignTxE, submit)
