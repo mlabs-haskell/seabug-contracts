@@ -12,6 +12,7 @@ module Test.Contract.Util
   , assertTxHasMetadata
   , callMintCnft
   , callMintSgNft
+  , callMintSgNft'
   , checkBalanceChangeAtAddr
   , checkNftAtAddress
   , checkOutputHasDatum
@@ -87,7 +88,7 @@ import Metadata.MetadataType (class MetadataType, metadataLabel)
 import Partial.Unsafe (unsafePartial)
 import Seabug.Contract.CnftMint (mintCnftTest)
 import Seabug.Contract.Mint (mintWithCollectionTest)
-import Seabug.Contract.Util (modify)
+import Seabug.Contract.Util (ReturnBehaviour(ToMarketPlace), modify)
 import Seabug.Types (MintCnftParams(..), MintParams, NftData)
 import Type.Proxy (Proxy(..))
 import Types.BigNum as BigNum
@@ -151,6 +152,28 @@ callMintCnft modConstraints = do
   log $ "Minted cnft: " <> show cnft
   pure cnft
 
+callMintSgNft'
+  :: forall (r :: Row Type)
+   . ReturnBehaviour
+  -> Tuple CurrencySymbol TokenName
+  -> MintParams
+  -> ( Constraints.TxConstraints Void Void
+       -> Contract r (Constraints.TxConstraints Void Void)
+     )
+  -> Contract r
+       { sgNft :: (CurrencySymbol /\ TokenName)
+       , nftData :: NftData
+       , txHash :: TransactionHash
+       }
+callMintSgNft' retBehaviour cnft mintParams modConstraints = do
+  log "Minting sgNft..."
+  txHash /\ sgNft /\ nftData <-
+    mintWithCollectionTest retBehaviour cnft mintParams modConstraints
+  log $ "Waiting for confirmation of nft transaction: " <> show txHash
+  awaitTxConfirmed txHash
+  log $ "Nft transaction confirmed: " <> show txHash
+  pure { sgNft, nftData, txHash }
+
 callMintSgNft
   :: forall (r :: Row Type)
    . Tuple CurrencySymbol TokenName
@@ -163,14 +186,7 @@ callMintSgNft
        , nftData :: NftData
        , txHash :: TransactionHash
        }
-callMintSgNft cnft mintParams modConstraints = do
-  log "Minting sgNft..."
-  txHash /\ sgNft /\ nftData <-
-    mintWithCollectionTest cnft mintParams modConstraints
-  log $ "Waiting for confirmation of nft transaction: " <> show txHash
-  awaitTxConfirmed txHash
-  log $ "Nft transaction confirmed: " <> show txHash
-  pure { sgNft, nftData, txHash }
+callMintSgNft = callMintSgNft' ToMarketPlace
 
 plutipConfig :: PlutipConfig
 plutipConfig =

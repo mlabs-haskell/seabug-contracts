@@ -7,14 +7,12 @@ module Seabug.Contract.Mint
 import Contract.Prelude
 
 import Contract.Address
-  ( getNetworkId
-  , ownPaymentPubKeyHash
-  , ownStakePubKeyHash
-  , payPubKeyHashBaseAddress
+  ( ownPaymentPubKeyHash
+  , getWalletAddress
   )
 import Contract.AuxiliaryData (setTxMetadata)
 import Contract.Chain (currentSlot, currentTime)
-import Contract.Monad (Contract, liftContractE, liftContractM, liftedE, liftedM)
+import Contract.Monad (Contract, liftContractE, liftedE, liftedM)
 import Contract.PlutusData (toData)
 import Contract.ScriptLookups as Lookups
 import Contract.Scripts (validatorHash)
@@ -28,13 +26,16 @@ import Contract.Value
   , scriptCurrencySymbol
   , singleton
   )
-import Seabug.Contract.Util (getSeabugMetadata)
+import Seabug.Contract.Util
+  ( ReturnBehaviour(ToMarketPlace)
+  , getSeabugMetadata
+  , payBehaviour
+  )
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.MintingPolicy as MintingPolicy
 import Seabug.Types
   ( LockDatum(..)
-  , MarketplaceDatum(..)
   , MintAct(..)
   , MintParams(..)
   , NftCollection(..)
@@ -44,23 +45,22 @@ import Seabug.Types
 
 mintWithCollectionTest
   :: forall (r :: Row Type)
-   . CurrencySymbol /\ TokenName
+   . ReturnBehaviour
+  -> CurrencySymbol /\ TokenName
   -> MintParams
   -> ( Constraints.TxConstraints Void Void
        -> Contract r (Constraints.TxConstraints Void Void)
      )
   -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
 mintWithCollectionTest
+  retBehaviour
   (collectionNftCs /\ collectionNftTn)
   ( MintParams
       { price, lockLockup, lockLockupEnd, authorShare, daoShare }
   )
   modConstraints = do
   owner <- liftedM "Cannot get PaymentPubKeyHash" ownPaymentPubKeyHash
-  ownerStake <- liftedM "Cannot get StakePubKeyHash" ownStakePubKeyHash
-  networkId <- getNetworkId
-  addr <- liftContractM "Cannot get user address" $
-    payPubKeyHashBaseAddress networkId owner ownerStake
+  addr <- liftedM "Cannot get address" getWalletAddress
   utxos <- liftedM "Cannot get user utxos" $ utxosAt addr
   marketplaceValidator' <- unwrap <$> marketplaceValidator
   lockingScript <- mkLockScript collectionNftCs lockLockup lockLockupEnd
@@ -95,11 +95,8 @@ mintWithCollectionTest
     constraints = mconcat
       [ Constraints.mustMintValueWithRedeemer (wrap $ toData $ MintToken nft)
           nftValue
-      , Constraints.mustPayToScript marketplaceValidator'.validatorHash
-          ( wrap $ toData $ MarketplaceDatum
-              { getMarketplaceDatum: curr /\ tn }
-          )
-          nftValue
+      , payBehaviour retBehaviour marketplaceValidator'.validatorHash
+          (curr /\ tn)
       , Constraints.mustPayToScript lockingScriptHash
           ( wrap $ toData $ LockDatum
               { sgNft: curr
@@ -127,7 +124,7 @@ mintWithCollection'
    . CurrencySymbol /\ TokenName
   -> MintParams
   -> Contract r (TransactionHash /\ (CurrencySymbol /\ TokenName) /\ NftData)
-mintWithCollection' c p = mintWithCollectionTest c p pure
+mintWithCollection' c p = mintWithCollectionTest ToMarketPlace c p pure
 
 -- | Mint the self-governed NFT for the given collection.
 mintWithCollection

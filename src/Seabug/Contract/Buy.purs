@@ -22,7 +22,7 @@ import Plutus.Types.Transaction (UtxoM)
 import Seabug.Contract.Util
   ( ReturnBehaviour(..)
   , SeabugTxData
-  , minAdaOnlyUTxOValue
+  , minUTxOValue
   , mkChangeNftIdTxData
   , modify
   , seabugTxToMarketTx
@@ -54,7 +54,7 @@ mkBuyTxData nftData mScriptUtxos = do
 
     shareToSubtract :: BigInt -> BigInt
     shareToSubtract v
-      | v < minAdaOnlyUTxOValue = zero
+      | v < minUTxOValue = zero
       | otherwise = v
 
     filterLowValue
@@ -62,7 +62,7 @@ mkBuyTxData nftData mScriptUtxos = do
       -> (Value.Value -> TxConstraints Void Void)
       -> TxConstraints Void Void
     filterLowValue v t
-      | v < minAdaOnlyUTxOValue = mempty
+      | v < minUTxOValue = mempty
       | otherwise = t (Value.lovelaceValueOf v)
 
     authorShare = getShare $ toBigInt nftCollection.authorShare

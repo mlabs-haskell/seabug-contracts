@@ -27,7 +27,7 @@ import Seabug.Contract.Util
   ( ReturnBehaviour(..)
   , SeabugTxData
   , getSeabugMetadata
-  , minAdaOnlyUTxOValue
+  , minUTxOValue
   , modify
   )
 import Seabug.MarketPlace (marketplaceValidatorAddr)
@@ -366,7 +366,7 @@ buyerMarketplaceUtxoAssert
 assertPaymentUtxo
   :: String -> Address -> BigInt -> PostBuyTestData -> Contract () Unit
 assertPaymentUtxo name addr payment { txData: { oldAsset } }
-  | payment < minAdaOnlyUTxOValue = pure unit
+  | payment < minUTxOValue = pure unit
   | otherwise =
       assertContract (name <> " did not have payment utxo with datum")
         =<< isJust

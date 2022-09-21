@@ -15,7 +15,7 @@ import Contract.Wallet (KeyWallet)
 import Data.BigInt as BigInt
 import Data.FoldableWithIndex (findWithIndex)
 import Mote (group, test)
-import Seabug.Contract.Util (getSeabugMetadata, minAdaOnlyUTxOValue, modify)
+import Seabug.Contract.Util (getSeabugMetadata, minUTxOValue, modify)
 import Seabug.Lock (mkLockScript)
 import Seabug.MarketPlace (marketplaceValidatorAddr)
 import Seabug.Types (LockDatum(..), MarketplaceDatum(..))
@@ -90,7 +90,7 @@ suite =
                     (MustPayToScript h d _)
                       | h == lockingScriptHash -> pure $
                           MustPayToScript h d
-                            (lovelaceValueOf minAdaOnlyUTxOValue)
+                            (lovelaceValueOf minUTxOValue)
                     x -> pure x
                 pure $ modify (_ { constraints = constraints' }) txc
 

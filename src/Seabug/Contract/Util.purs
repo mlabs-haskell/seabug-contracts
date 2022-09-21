@@ -1,11 +1,12 @@
 module Seabug.Contract.Util
-  ( SeabugTxData
-  , ReturnBehaviour(..)
-  , minAdaOnlyUTxOValue
+  ( ReturnBehaviour(..)
+  , SeabugTxData
+  , getSeabugMetadata
+  , minUTxOValue
   , mkChangeNftIdTxData
   , modify
+  , payBehaviour
   , seabugTxToMarketTx
-  , getSeabugMetadata
   ) where
 
 import Contract.Prelude
@@ -61,6 +62,7 @@ import Seabug.Types
   , NftData(..)
   , NftId
   )
+import Types.Scripts (ValidatorHash)
 import Types.Transaction (TransactionInput)
 
 type SeabugTxData =
@@ -77,6 +79,22 @@ modify :: forall t a. Newtype t a => (a -> a) -> t -> t
 modify fn t = wrap (fn (unwrap t))
 
 data ReturnBehaviour = ToMarketPlace | ToCaller
+
+payBehaviour
+  :: ReturnBehaviour
+  -> ValidatorHash
+  -> (Value.CurrencySymbol /\ Value.TokenName)
+  -> TxConstraints Void Void
+payBehaviour ToCaller _ _ = mempty -- Balancing will return the token to the caller
+payBehaviour ToMarketPlace valHash asset =
+  mustPayToScript
+    valHash
+    ( Datum $ toData $
+        MarketplaceDatum { getMarketplaceDatum: asset }
+    )
+    ( Value.singleton (fst asset) (snd asset) one <> Value.lovelaceValueOf
+        minUTxOValue
+    )
 
 -- | Build and submit a transaction involving a given nft, specifying
 -- | if the nft should be sent to the current user or the marketplace.
@@ -106,22 +124,11 @@ seabugTxToMarketTx name retBehaviour mkTxData nftData = do
       [ ScriptLookups.typedValidatorLookups $ wrap marketplaceValidator'
       , ScriptLookups.validator marketplaceValidator'.validator
       ]
-    newNftValue =
-      Value.singleton (fst txData.newAsset) (snd txData.newAsset) one
 
     constraints :: TxConstraints Void Void
     constraints = txData.constraints
       <> mustSpendScriptOutput txData.inputUtxo unitRedeemer
-      <>
-        case retBehaviour of
-          ToMarketPlace ->
-            mustPayToScript
-              valHash
-              ( Datum $ toData $
-                  MarketplaceDatum { getMarketplaceDatum: txData.newAsset }
-              )
-              newNftValue
-          ToCaller -> mempty -- Balancing will return the token to the caller
+      <> payBehaviour retBehaviour valHash txData.newAsset
 
   txDatumsRedeemerTxIns <- liftedE $ mkUnbalancedTx lookups constraints
   metadata <- liftContractE $ getSeabugMetadata
@@ -208,8 +215,8 @@ mkChangeNftIdTxData name act mapNft (NftData nftData) mScriptUtxos = do
     , newNft: newNft
     }
 
-minAdaOnlyUTxOValue :: BigInt
-minAdaOnlyUTxOValue = BigInt.fromInt 2_000_000
+minUTxOValue :: BigInt
+minUTxOValue = BigInt.fromInt 2_000_000
 
 -- | Set metadata on the transaction for the given NFT
 getSeabugMetadata
