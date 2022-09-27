@@ -17,8 +17,9 @@ export function getWalletBalance(config: Config): Promise<any>
 export type WalletOption = "Nami" | "Gero";
 
 export type NetworkId
-    = 0 // Testnet
-    | 1 // Mainnet
+    = 2 // Preview
+    | 1 // Pre-production
+    | 0 // Mainnet
 
 export type Config = {
     serverHost: string,
