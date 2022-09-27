@@ -12,7 +12,7 @@ module Seabug.CallContract
 import Contract.Prelude hiding (null)
 
 import Contract.Address (Slot(Slot))
-import Contract.Config (ConfigParams)
+import Contract.Config (ConfigParams, WalletSpec(..))
 import Contract.Monad (runContract)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.Prim.ByteArray (byteArrayToHex, hexToByteArray)
@@ -262,7 +262,7 @@ buildContractConfig cfg = do
     , logLevel: logLevel
     , suppressLogs: true
     , extraConfig: {}
-    , walletSpec: Nothing
+    , walletSpec: Just ConnectToNami
     , customLogger: Nothing
     }
 
