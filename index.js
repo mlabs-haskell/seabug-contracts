@@ -51,3 +51,6 @@ exports.getWalletBalance = async (config) => {
 
 // Uncomment this for manually minting new tokens (see README)
 // seabug.then((sb) => sb.mint().then(() => console.log("Done")))
+
+// Uncomment this for manually relisting/selling tokens (see README)
+// seabug.then((sb) => sb.sell().then(() => console.log("Done")))

@@ -1,6 +1,7 @@
 module Seabug
-  ( module Seabug.CallContract
-  , mint
+  ( mint
+  , module Seabug.CallContract
+  , sell
   ) where
 
 import Contract.Prelude
@@ -8,16 +9,35 @@ import Contract.Prelude
 import Control.Promise (Promise)
 import Data.BigInt as BigInt
 import Seabug.CallContract
-  ( callConnectWallet
-  , callMarketPlaceBuy
-  , callMarketPlaceListNft
-  , callMarketPlaceFetchNft
-  , callMint
+  ( ContractConfiguration
+  , callConnectWallet
   , callGetWalletBalance
+  , callMarketPlaceBuy
+  , callMarketPlaceFetchNft
+  , callMarketPlaceListNft
+  , callMarketPlaceSell
+  , callMint
   )
 
 mint :: Effect (Promise Unit)
-mint = callMint
+mint = callMint config
+  { -- base36 ipfs cid obtained from upload-image.sh
+    imageUri: "ipfs://k2cwueahicvck9req1x9ej93oq6y71wtez2tnr10g4a9wl0mwy7wz9r5"
+  , tokenNameString: "abcdef"
+  , name: "Bee"
+  , description: "From pixabay"
+  , price: BigInt.fromInt (120 * 1000000)
+  }
+
+sell :: Effect (Promise Unit)
+sell = callMarketPlaceSell config
+  { tokenCS: "a1ab229c7e657eb0f258bb78fe01efbb4c06d5490540734a0400b844"
+  , tokenName:
+      "e3b8d0618070674104fa8dcd4ed57c7595e21b648aa83b93e22af5590f6fe8a8"
+  }
+
+config :: ContractConfiguration
+config =
   { serverHost: "ctl.localho.st"
   , serverPort: 8080
   , serverSecureConn: false
@@ -30,11 +50,4 @@ mint = callMint
   , networkId: 0
   , projectId: "testnetu7qDM8q2XT1S6gEBSicUIqXB6QN60l7B"
   , logLevel: "Trace"
-  }
-  { -- base36 ipfs cid obtained from upload-image.sh
-    imageUri: "ipfs://k2cwuebwvb6kdiwob6sb2yqnz38r0yv72q1xijbts9ep5lq3nm8rw3i4"
-  , tokenNameString: "abcdef"
-  , name: "Piaggio Ape"
-  , description: "Seabug Testing"
-  , price: BigInt.fromInt (12 * 1000000)
   }

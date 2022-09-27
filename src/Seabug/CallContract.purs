@@ -1,5 +1,6 @@
 module Seabug.CallContract
-  ( callConnectWallet
+  ( ContractConfiguration
+  , callConnectWallet
   , callGetWalletBalance
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
