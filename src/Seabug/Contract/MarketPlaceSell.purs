@@ -23,7 +23,7 @@ import Effect.Exception (throw)
 import Seabug.MarketPlace (marketplaceValidator)
 import Seabug.Types (MarketplaceDatum(..))
 
--- | Mint the self-governed NFT for the given collection.
+-- | List the given collection NFT on the marketplace
 marketPlaceSell
   :: forall (r :: Row Type)
    . CurrencySymbol /\ TokenName

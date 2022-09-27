@@ -34,3 +34,15 @@ The minting process currently requires some manual steps. To mint a new NFT:
   - The stake key will also be necessary for minting, the command `cardano-cli stake-address key-gen --signing-key-file stake.skey --verification-key-file stake.vkey` can be used to get a stake key
 - Add the wallet that you minted with as an artist to the
   `nft-marketplace-server` database with `admin/create_artist`
+
+## Listing (aka selling)
+
+To put a collection NFT from your wallet on the marketplace:
+
+- Uncomment [this line](https://github.com/mlabs-haskell/seabug-contracts/blob/df982074de50d79f18dab20f5fc55d0cf406ba67/index.js#L56) to run the sell contract on page load
+- Update [the sell function](https://github.com/mlabs-haskell/seabug-contracts/blob/df982074de50d79f18dab20f5fc55d0cf406ba67/src/Seabug/Seabug.purs#L32-L37) with details of the collection NFT in the wallet
+  - The currency symbol and token name will be logged to the console when the NFT is bought, and they can be copied here
+- Rebuild with `make run-build` and reload the local running Seabug website, this will trigger the listing transaction
+  - Alternatively, use `make run-dev` in the same way as with minting
+- Reloading the page again should now show the NFT in the marketplace
+- Re-comment the above line to stop running the sell contract on page load
