@@ -47,7 +47,7 @@ config =
   , datumCacheHost: "localho.st"
   , datumCachePort: 9999
   , datumCacheSecureConn: false
-  , networkId: 0
-  , projectId: "testnetu7qDM8q2XT1S6gEBSicUIqXB6QN60l7B"
+  , networkId: 2
+  , projectId: "previewoXa2yw1U0z39X4VmTs6hstw4c6cPx1LN"
   , logLevel: "Trace"
   }
