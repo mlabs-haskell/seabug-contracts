@@ -7,7 +7,7 @@ module Seabug.Contract.Buy
 import Contract.Prelude
 
 import Contract.Address (ownPaymentPubKeyHash)
-import Contract.Monad (Contract, liftedM)
+import Contract.Monad (Contract, liftedM, throwContractError)
 import Contract.Numeric.Natural (toBigInt)
 import Contract.PlutusData (Datum(Datum), toData)
 import Contract.Transaction (TransactionHash)
@@ -39,16 +39,19 @@ mkBuyTxData nftData mScriptUtxos = do
   pkh <- liftedM "buy: Cannot get PaymentPubKeyHash"
     ownPaymentPubKeyHash
 
-  txData <- mkChangeNftIdTxData "buy" (flip ChangeOwner pkh)
-    (modify $ _ { owner = pkh })
-    nftData
-    mScriptUtxos
   let
     nftData' = unwrap nftData
     nftCollection = unwrap nftData'.nftCollection
     nftId = unwrap nftData'.nftId
     nftPrice = nftId.price
 
+  when (nftId.owner == pkh) $ throwContractError "NFT is already owned by buyer"
+
+  txData <- mkChangeNftIdTxData "buy" (flip ChangeOwner pkh)
+    (modify $ _ { owner = pkh })
+    nftData
+    mScriptUtxos
+  let
     getShare :: BigInt -> BigInt
     getShare share = (toBigInt nftPrice * share) `div` fromInt maxShare
 
