@@ -1,0 +1,55 @@
+| Seabug Test Report |
+
+seabug-contracts commit: 33316bbd933f28fd57316ee36c7579fd3443f5f7
+Date: September 9th, 2022
+Network: Plutip local testnet
+
+See this PR for more details on what is being tested: https://github.com/mlabs-haskell/seabug-contracts/pull/41
+
+Minting (Allow artist/users to mint new NFT tokens)
+  ✓︎ Cnft mint fail: expect "UTxO not consumed" trace -- Test case for invalid Cnft minting
+  ✓︎ Successful mint
+Minting (Allow artist/users to mint new NFT tokens) » SgNft mint fail -- Test cases for invalid SgNft minting
+  ✓︎ expect "Exactly one NFT must be minted" trace
+  ✓︎ expect "Underlying NFT must be locked" trace
+Buy: -- Test cases for different buy scenarios
+- (Allow users to Purchase and receive an NFT in their Wallet)
+- (Allow the marketplace to collect a fee for conducting a sale/auction)
+- (Allow the artist to collect royalties on secondary sales)
+  ✓︎ price too low for min ada requirement
+    -- Tests for asserting the rounding behaviour when the final share/royalty amount is not a whole number
+        -- Default: The author is selling the nft
+  ✓︎ fractional shares (.5)
+  ✓︎ fractional shares (.5), author is not seller
+  ✓︎ fractional shares (.1)
+  ✓︎ fractional shares (.1), author is not seller
+  ✓︎ fractional shares (.9)
+  ✓︎ fractional shares (.9), author is not seller
+    -- Variations of the scenario where marketplace and author receive royalties
+        -- Default: Nft is put directly back on the marketplace, and the author is selling the nft
+  ✓︎ no low shares
+        -- The nft goes directly to the buyer, instead of going back onto the marketplace
+  ✓︎ no low shares, nft to buyer
+        -- The author of the nft is not the one selling it (it has been bought already)
+  ✓︎ no low shares, author is not seller
+  ✓︎ no low shares, author is not seller, nft to buyer
+    -- Variations of the scenario where the marketplace's share is too low to receive royalties
+  ✓︎ low marketplace share
+  ✓︎ low marketplace share, nft to buyer
+  ✓︎ low marketplace share, author is not seller
+  ✓︎ low marketplace share, author is not seller, nft to buyer
+    -- Variations of the scenario where the author's share is too low to receive royalties
+  ✓︎ low author share
+  ✓︎ low author share, nft to buyer
+  ✓︎ low author share, author is not seller
+  ✓︎ low author share, author is not seller, nft to buyer
+    -- Variations of the scenario where both the marketplace's and the author's shares are too low to receive royalties
+  ✓︎ low author and marketplace shares
+  ✓︎ low author and marketplace shares, nft to buyer
+  ✓︎ low author and marketplace shares, author is not seller
+  ✓︎ low author and marketplace shares, author is not seller, nft to buyer
+Sell (Allow artist/users to sell NFT tokens)
+  ✓︎ Successful Sell and rebuy -- Test for an nft being listed on the marketplace then bought
+
+Summary
+28/28 tests passed

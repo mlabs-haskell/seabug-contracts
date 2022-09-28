@@ -220,7 +220,9 @@ addAuthorNotSellerVariants = addVariants \conf ->
 
 suite :: TestPlanM Unit
 suite =
-  group "Buy" do
+  group ("Buy:\n- (Allow users to Purchase and receive an NFT in their Wallet)"
+          <> "\n- (Allow the marketplace to collect a fee for conducting a sale/auction)"
+          <> "\n- (Allow the artist to collect royalties on secondary sales)") do
     let
       tests =
         [ buyTestConfig5 ]
