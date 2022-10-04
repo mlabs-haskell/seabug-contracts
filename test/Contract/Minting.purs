@@ -36,7 +36,7 @@ import TestM (TestPlanM)
 
 suite :: TestPlanM Unit
 suite =
-  group "Minting" do
+  group "Minting (Allow artist/users to mint new NFT tokens)" do
     test "Cnft mint fail: expect \"UTxO not consumed\" trace" $ expectError $
       withMinter \_ -> do
         addr <- liftedM "Could not get addr" getWalletAddress

@@ -30,7 +30,7 @@ import TestM (TestPlanM)
 
 suite :: TestPlanM Unit
 suite =
-  group "Sell" do
+  group "Sell (Allow artist/users to sell NFT tokens)" do
     test "Successful Sell and rebuy" do
       withMinterAndBuyer \minter buyer -> do
         nftData <- withKeyWallet minter do

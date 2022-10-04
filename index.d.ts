@@ -16,6 +16,8 @@ export function getWalletBalance(config: Config): Promise<any>
 
 export type WalletOption = "Nami" | "Gero";
 
+/** Corresponds to the network tag from
+ * https://cips.cardano.org/cips/cip19/#networktag */
 export type NetworkId
     = 0 // Testnet
     | 1 // Mainnet

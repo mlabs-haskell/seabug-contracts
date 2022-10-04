@@ -200,4 +200,4 @@ mkGetRequest path = do
       (Aeson.parseJsonStringToAeson res.body)
   where
   mkUrl :: String
-  mkUrl = "https://cardano-testnet.blockfrost.io/api/v0/" <> path
+  mkUrl = "https://cardano-preview.blockfrost.io/api/v0/" <> path
