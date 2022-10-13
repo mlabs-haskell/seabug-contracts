@@ -1,7 +1,7 @@
 module Seabug.CallContract
   ( ContractConfiguration
-  , callConnectWallet
   , callGetWalletBalance
+  , callGetWalletPkh
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
@@ -11,7 +11,7 @@ module Seabug.CallContract
 
 import Contract.Prelude hiding (null)
 
-import Contract.Address (Slot(Slot))
+import Contract.Address (Slot(Slot), ownPubKeyHash)
 import Contract.Config (ConfigParams, WalletSpec(..))
 import Contract.Monad (runContract)
 import Contract.Numeric.Natural (toBigInt)
@@ -29,11 +29,12 @@ import Contract.Value
   , currencyMPSHash
   , flattenNonAdaAssets
   , getCurrencySymbol
+  , getLovelace
   , getTokenName
   , mkCurrencySymbol
   , mkTokenName
+  , valueToCoin
   )
-import Control.Monad.Error.Class (throwError)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.Bifunctor (lmap)
@@ -73,22 +74,20 @@ import Serialization.Hash
   )
 import Types.BigNum as BigNum
 import Types.Natural as Nat
-import Wallet (Wallet, mkNamiWalletAff, mkGeroWalletAff)
+import Types.RawBytes (rawBytesToHex)
 
-callConnectWallet
-  :: forall (r :: Row Type)
-   . String
-  -> Effect (Promise Wallet)
-callConnectWallet walletOption = case walletOption of
-  "Nami" -> Promise.fromAff mkNamiWalletAff
-  "Gero" -> Promise.fromAff mkGeroWalletAff
-  _ -> throwError <<< error $ "Unsupported wallet: " <> walletOption
+callGetWalletPkh :: ContractConfiguration -> Effect (Promise (Nullable String))
+callGetWalletPkh cfg = Promise.fromAff do
+  contractConfig <- liftEither $ buildContractConfig cfg
+  (toNullable <<< map (rawBytesToHex <<< ed25519KeyHashToBytes <<< unwrap)) <$>
+    runContract contractConfig ownPubKeyHash
 
 callGetWalletBalance
-  :: ContractConfiguration -> Effect (Promise (Nullable Value))
+  :: ContractConfiguration -> Effect (Promise (Nullable BigInt))
 callGetWalletBalance cfg = Promise.fromAff do
   contractConfig <- liftEither $ buildContractConfig cfg
-  toNullable <$> runContract contractConfig getWalletBalance
+  (toNullable <<< map (getLovelace <<< valueToCoin)) <$>
+    runContract contractConfig getWalletBalance
 
 callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do

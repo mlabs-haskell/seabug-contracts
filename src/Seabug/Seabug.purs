@@ -10,7 +10,7 @@ import Control.Promise (Promise)
 import Data.BigInt as BigInt
 import Seabug.CallContract
   ( ContractConfiguration
-  , callConnectWallet
+  , callGetWalletPkh
   , callGetWalletBalance
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
