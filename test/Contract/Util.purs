@@ -192,7 +192,7 @@ plutipConfig :: PlutipConfig
 plutipConfig =
   { host: "127.0.0.1"
   , port: UInt.fromInt 8082
-  , logLevel: Debug
+  , logLevel: Error
   , suppressLogs: true
   , customLogger: Nothing
   , ogmiosConfig:
