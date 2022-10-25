@@ -1,6 +1,7 @@
 | Seabug Test Report |
 
-seabug-contracts commit: 94512e198aff2deb67fd41d9034ddd64af62f583
+seabug-contracts latest change to code commit: 94512e198aff2deb67fd41d9034ddd64af62f583
+seabug-contracts commit: 82ac6516bd578656883835dd75ddf0db6deed889
 Date: October 24th, 2022
 Network: Plutip local testnet
 
