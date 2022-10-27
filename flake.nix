@@ -63,6 +63,10 @@
             sources = [ "exe" "src" ];
             main = "Main";
           };
+          seabug-contracts = (project.bundlePursProject {
+             sources = [ "exe" "src" ];
+             main = "Seabug";
+          });
         });
 
       checks = perSystem (system:
