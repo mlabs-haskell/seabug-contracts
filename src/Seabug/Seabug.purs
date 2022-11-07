@@ -11,7 +11,7 @@ import Data.BigInt as BigInt
 import Seabug.CallContract
   ( ContractConfiguration
   , callGetWalletPkh
-  , callGetWalletBalance
+  , callGetWalletLovelace
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft

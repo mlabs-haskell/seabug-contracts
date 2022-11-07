@@ -11,7 +11,7 @@ export function callMarketPlaceListNft(config: Config):
  */
 export function callMarketPlaceFetchNft(config: Config, args: FetchNftArgs):
     Promise<NftListing?>
-export function getWalletBalance(config: Config): Promise<any>
+export function getWalletLovelace(config: Config): Promise<any>
 export function getWalletPkh(config: Config): Promise<string?>
 
 export type WalletOption = "Nami" | "Gero";

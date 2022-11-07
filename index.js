@@ -35,9 +35,9 @@ exports.callMarketPlaceFetchNft = async (config, args) => {
 /**
  * Returns a promise containing the connected wallet's lovelace balance.
  */
-exports.getWalletBalance = async (config) => {
+exports.getWalletLovelace = async (config) => {
   const sb = await seabug;
-  return sb.callGetWalletBalance(config)();
+  return sb.callGetWalletLovelace(config)();
 };
 
 /**

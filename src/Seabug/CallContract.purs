@@ -1,6 +1,6 @@
 module Seabug.CallContract
   ( ContractConfiguration
-  , callGetWalletBalance
+  , callGetWalletLovelace
   , callGetWalletPkh
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
@@ -85,9 +85,9 @@ callGetWalletPkh cfg = Promise.fromAff do
   (toNullable <<< map (rawBytesToHex <<< ed25519KeyHashToBytes <<< unwrap)) <$>
     runContract contractConfig ownPubKeyHash
 
-callGetWalletBalance
+callGetWalletLovelace
   :: ContractConfiguration -> Effect (Promise (Nullable BigInt))
-callGetWalletBalance cfg = Promise.fromAff do
+callGetWalletLovelace cfg = Promise.fromAff do
   contractConfig <- liftEither $ buildContractConfig cfg defaultWalletSpec
   (toNullable <<< map (getLovelace <<< valueToCoin)) <$>
     runContract contractConfig getWalletBalance
