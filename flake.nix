@@ -12,8 +12,8 @@
       repo = "cardano-transaction-lib";
       # should be same rev as in packages.dhall
       # To update, do `spago2nix generate`
-      # `develop` branch
-      rev = "09540ea3915be20e5095b3b6f2418ddd712eb58e";
+      # `seabug/main` branch
+      rev = "55c9ec24286c87c9caf2aa28a618200a26428a68";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };

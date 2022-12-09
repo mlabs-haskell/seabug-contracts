@@ -38,7 +38,6 @@ import Effect.Random (randomRange)
 import Seabug.Metadata.Types
   ( SeabugMetadata(SeabugMetadata)
   , decodeSeabugMetadataAeson
-  , metadataBytesString
   )
 
 type Hash = String
@@ -105,7 +104,7 @@ getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
   r <- mkGetRequest ("assets/" <> mkAsset collectionNftCS collectionNftTN)
   imageAeson <- except $ lmap (BlockfrostOtherError <<< show) $
     getNestedAeson r
-      [ "onchain_metadata", currSymKey, tokenNameKey, "image" ]
+      [ "onchain_metadata", "image" ]
   except $ lmap BlockfrostOtherError $ caseAeson
     ( constAesonCases
         ( Left "Could not parse image field as string or array"
@@ -118,12 +117,6 @@ getIpfsHash (SeabugMetadata { collectionNftCS, collectionNftTN }) = do
         }
     )
     imageAeson
-  where
-  currSymKey :: String
-  currSymKey = metadataBytesString $ getCurrencySymbol collectionNftCS
-
-  tokenNameKey :: String
-  tokenNameKey = metadataBytesString $ getTokenName collectionNftTN
 
 getMintingTxSeabugMetadata
   :: forall (r :: Row Type)

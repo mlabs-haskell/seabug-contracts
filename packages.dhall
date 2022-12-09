@@ -365,7 +365,7 @@ let additions =
             ]
         , repo = "https://github.com/Plutonomicon/cardano-transaction-lib.git"
           -- should be same rev as in flake.nix
-        , version = "09540ea3915be20e5095b3b6f2418ddd712eb58e"
+        , version = "55c9ec24286c87c9caf2aa28a618200a26428a68"
         }
       }
 in upstream // additions
