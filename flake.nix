@@ -13,7 +13,7 @@
       # should be same rev as in packages.dhall
       # To update, do `spago2nix generate`
       # `seabug/main` branch
-      rev = "55c9ec24286c87c9caf2aa28a618200a26428a68";
+      rev = "f2090a4daf6f48e549c55978296e2e3b09c3ed4f";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };
