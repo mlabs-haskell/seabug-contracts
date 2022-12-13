@@ -12,8 +12,8 @@
       repo = "cardano-transaction-lib";
       # should be same rev as in packages.dhall
       # To update, do `spago2nix generate`
-      # `develop` branch
-      rev = "09540ea3915be20e5095b3b6f2418ddd712eb58e";
+      # `seabug/main` branch
+      rev = "f2090a4daf6f48e549c55978296e2e3b09c3ed4f";
     };
     nixpkgs.follows = "cardano-transaction-lib/nixpkgs";
   };
@@ -63,6 +63,10 @@
             sources = [ "exe" "src" ];
             main = "Main";
           };
+          seabug-contracts = (project.bundlePursProject {
+             sources = [ "exe" "src" ];
+             main = "Seabug";
+          });
         });
 
       checks = perSystem (system:

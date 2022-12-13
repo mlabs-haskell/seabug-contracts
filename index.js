@@ -33,20 +33,19 @@ exports.callMarketPlaceFetchNft = async (config, args) => {
 };
 
 /**
- * Connects to Nami or Gero wallet.
- * Returns a promise holding the Wallet object.
+ * Returns a promise containing the connected wallet's lovelace balance.
  */
-exports.connectWallet = async (walletOption) => {
+exports.getWalletLovelace = async (config) => {
   const sb = await seabug;
-  return sb.callConnectWallet(walletOption)();
+  return sb.callGetWalletLovelace(config)();
 };
 
 /**
- * Returns a promise containing the connected wallet's balance.
+ * Returns a promise containing the connected wallet's public key hash.
  */
-exports.getWalletBalance = async (config) => {
+exports.getWalletPkh = async (config) => {
   const sb = await seabug;
-  return sb.callGetWalletBalance(config);
+  return sb.callGetWalletPkh(config)();
 };
 
 // Uncomment this for manually minting new tokens (see README)

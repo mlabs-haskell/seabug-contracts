@@ -1,7 +1,7 @@
 module Seabug.CallContract
   ( ContractConfiguration
-  , callConnectWallet
-  , callGetWalletBalance
+  , callGetWalletLovelace
+  , callGetWalletPkh
   , callMarketPlaceBuy
   , callMarketPlaceFetchNft
   , callMarketPlaceListNft
@@ -11,7 +11,7 @@ module Seabug.CallContract
 
 import Contract.Prelude hiding (null)
 
-import Contract.Address (Slot(Slot))
+import Contract.Address (Slot(Slot), ownPubKeyHash)
 import Contract.Config (ConfigParams, WalletSpec(..))
 import Contract.Monad (runContract)
 import Contract.Numeric.Natural (toBigInt)
@@ -29,11 +29,12 @@ import Contract.Value
   , currencyMPSHash
   , flattenNonAdaAssets
   , getCurrencySymbol
+  , getLovelace
   , getTokenName
   , mkCurrencySymbol
   , mkTokenName
+  , valueToCoin
   )
-import Control.Monad.Error.Class (throwError)
 import Control.Promise (Promise)
 import Control.Promise as Promise
 import Data.Bifunctor (lmap)
@@ -73,26 +74,27 @@ import Serialization.Hash
   )
 import Types.BigNum as BigNum
 import Types.Natural as Nat
-import Wallet (Wallet, mkNamiWalletAff, mkGeroWalletAff)
+import Types.RawBytes (rawBytesToHex)
 
-callConnectWallet
-  :: forall (r :: Row Type)
-   . String
-  -> Effect (Promise Wallet)
-callConnectWallet walletOption = case walletOption of
-  "Nami" -> Promise.fromAff mkNamiWalletAff
-  "Gero" -> Promise.fromAff mkGeroWalletAff
-  _ -> throwError <<< error $ "Unsupported wallet: " <> walletOption
+defaultWalletSpec :: Maybe WalletSpec
+defaultWalletSpec = Just ConnectToNami
 
-callGetWalletBalance
-  :: ContractConfiguration -> Effect (Promise (Nullable Value))
-callGetWalletBalance cfg = Promise.fromAff do
-  contractConfig <- liftEither $ buildContractConfig cfg
-  toNullable <$> runContract contractConfig getWalletBalance
+callGetWalletPkh :: ContractConfiguration -> Effect (Promise (Nullable String))
+callGetWalletPkh cfg = Promise.fromAff do
+  contractConfig <- liftEither $ buildContractConfig cfg defaultWalletSpec
+  (toNullable <<< map (rawBytesToHex <<< ed25519KeyHashToBytes <<< unwrap)) <$>
+    runContract contractConfig ownPubKeyHash
+
+callGetWalletLovelace
+  :: ContractConfiguration -> Effect (Promise (Nullable BigInt))
+callGetWalletLovelace cfg = Promise.fromAff do
+  contractConfig <- liftEither $ buildContractConfig cfg defaultWalletSpec
+  (toNullable <<< map (getLovelace <<< valueToCoin)) <$>
+    runContract contractConfig getWalletBalance
 
 callMint :: ContractConfiguration -> MintArgs -> Effect (Promise Unit)
 callMint cfg args = Promise.fromAff do
-  contractConfig <- liftEither $ buildContractConfig cfg
+  contractConfig <- liftEither $ buildContractConfig cfg defaultWalletSpec
   mintCnftParams /\ mintParams <- liftEither $ buildMintArgs args
   runContract contractConfig $ do
     log "Minting cnft..."
@@ -112,7 +114,7 @@ callMarketPlaceFetchNft
   -> TransactionInputOut
   -> Effect (Promise (Nullable ListNftResultOut))
 callMarketPlaceFetchNft cfg args = Promise.fromAff do
-  contractConfig <- liftEither $ buildContractConfig cfg
+  contractConfig <- liftEither $ buildContractConfig cfg Nothing
   txInput <- liftEither $ buildTransactionInput args
   runContract contractConfig (marketPlaceFetchNft cfg.projectId txInput) >>=
     case _ of
@@ -125,7 +127,7 @@ callMarketPlaceFetchNft cfg args = Promise.fromAff do
 callMarketPlaceBuy
   :: ContractConfiguration -> BuyNftArgs -> Effect (Promise Unit)
 callMarketPlaceBuy cfg args = Promise.fromAff do
-  contractConfig <- liftEither $ buildContractConfig cfg
+  contractConfig <- liftEither $ buildContractConfig cfg defaultWalletSpec
   nftData <- liftEither $ buildNftData args
   runContract contractConfig (marketplaceBuy nftData)
 
@@ -134,7 +136,7 @@ callMarketPlaceBuy cfg args = Promise.fromAff do
 callMarketPlaceListNft
   :: ContractConfiguration -> Effect (Promise (Array ListNftResultOut))
 callMarketPlaceListNft cfg = Promise.fromAff do
-  contractConfig <- liftEither $ buildContractConfig cfg
+  contractConfig <- liftEither $ buildContractConfig cfg Nothing
   listnft <- runContract contractConfig (marketPlaceListNft cfg.projectId)
   pure $ buildNftList contractConfig.networkId <$> listnft
 
@@ -143,7 +145,7 @@ callMarketPlaceListNft cfg = Promise.fromAff do
 callMarketPlaceSell
   :: ContractConfiguration -> SellArgs -> Effect (Promise Unit)
 callMarketPlaceSell cfg args = Promise.fromAff do
-  contractConfig <- liftEither $ buildContractConfig cfg
+  contractConfig <- liftEither $ buildContractConfig cfg defaultWalletSpec
   sellArgs <- liftEither $ buildSellArgs args
   runContract contractConfig do
     txHash <- marketPlaceSell sellArgs
@@ -225,8 +227,8 @@ type SellArgs =
   }
 
 buildContractConfig
-  :: ContractConfiguration -> Either Error (ConfigParams ())
-buildContractConfig cfg = do
+  :: ContractConfiguration -> Maybe WalletSpec -> Either Error (ConfigParams ())
+buildContractConfig cfg walletSpec = do
   serverPort <- note (error "Invalid server port number")
     $ UInt.fromInt' cfg.serverPort
   ogmiosPort <- note (error "Invalid ogmios port number")
@@ -262,7 +264,7 @@ buildContractConfig cfg = do
     , logLevel: logLevel
     , suppressLogs: true
     , extraConfig: {}
-    , walletSpec: Just ConnectToNami
+    , walletSpec
     , customLogger: Nothing
     }
 
