@@ -1,8 +1,8 @@
 | Seabug Test Report |
 
-seabug-contracts latest change to code commit: 83dea7abf93fdba2a944276904e21d105af9db91
-seabug-contracts commit: 83dea7abf93fdba2a944276904e21d105af9db91
-Date: December 9th, 2022
+seabug-contracts latest change to code commit: ef4b83cd3ad0e0c9dabd89bfbab81505535ff806
+seabug-contracts commit: ef4b83cd3ad0e0c9dabd89bfbab81505535ff806
+Date: December 13th, 2022
 Network: Plutip local testnet
 
 See this PR for more details on what is being tested: https://github.com/mlabs-haskell/seabug-contracts/pull/41
